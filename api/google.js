@@ -21,7 +21,11 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-function getDateRange(days) {
+function getDateRange(req) {
+  if (req.query.since && req.query.until) {
+    return { since: req.query.since, until: req.query.until };
+  }
+  const days = parseInt(req.query.days) || 14;
   const until = new Date();
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -33,8 +37,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const days = parseInt(req.query.days) || 14;
-  const { since, until } = getDateRange(days);
+  const { since, until } = getDateRange(req);
 
   try {
     const accessToken = await getAccessToken();
@@ -49,13 +52,12 @@ export default async function handler(req, res) {
         metrics.conversions,
         segments.date
       FROM campaign
-      WHERE campaign.status = 'ENABLED'
-        AND segments.date BETWEEN '${since}' AND '${until}'
+      WHERE segments.date BETWEEN '${since}' AND '${until}'
       ORDER BY segments.date DESC
     `;
 
     const response = await fetch(
-      `https://googleads.googleapis.com/v16/customers/${CUSTOMER_ID}/googleAds:searchStream`,
+      `https://googleads.googleapis.com/v20/customers/${CUSTOMER_ID}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {

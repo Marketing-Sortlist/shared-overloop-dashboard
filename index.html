@@ -8,106 +8,202 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0b0f1a;
-    --surface: #131929;
-    --surface2: #1a2236;
-    --border: #232d44;
-    --text: #e2e8f0;
-    --muted: #7a8ba8;
-    --accent: #4f8ef7;
-    --green: #22c55e;
-    --red: #ef4444;
-    --yellow: #f59e0b;
-    --meta: #1877f2;
-    --google: #ea4335;
+    --bg: #0b0f1a; --surface: #131929; --surface2: #1a2236; --border: #232d44;
+    --text: #e2e8f0; --muted: #7a8ba8; --accent: #4f8ef7; --green: #22c55e;
+    --red: #ef4444; --yellow: #f59e0b; --meta: #1877f2; --google: #ea4335;
+    --organic: #8b5cf6; --direct: #94a3b8; --teal: #14b8a6;
   }
   body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; }
 
-  header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  /* Header */
+  header { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; background: var(--bg); }
+  .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
   .logo span { color: var(--accent); }
-  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-
-  .period-tabs { display: flex; background: var(--surface); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-  .period-tabs button { padding: 6px 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
-  .period-tabs button.active { background: var(--accent); color: #fff; }
-  .period-tabs button:hover:not(.active) { color: var(--text); }
-
-  .btn { padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: background .15s; }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 5px; transition: background .15s; }
   .btn:hover { background: var(--surface2); }
-  .btn svg { width: 14px; height: 14px; }
+  .btn svg { width: 13px; height: 13px; }
+  .timestamp { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .divider { width: 1px; height: 20px; background: var(--border); }
 
-  .timestamp { font-size: 12px; color: var(--muted); }
+  /* Date picker */
+  .dp-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .dp-btn:hover { background: var(--surface2); }
+  .dp-btn .dp-label { color: var(--accent); font-weight: 600; }
+  .dp-btn .dp-range { color: var(--muted); font-size: 11px; }
+  .dp-panel { display: none; position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: 420px; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .dp-panel.open { display: block; }
+  .dp-wrap { position: relative; }
+  .dp-unit-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .dp-unit-tabs button { padding: 6px 14px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .dp-unit-tabs button.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .dp-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .dp-radio { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; padding: 4px 0; }
+  .dp-radio input[type=radio] { accent-color: var(--teal); width: 14px; height: 14px; cursor: pointer; }
+  .dp-radio label { cursor: pointer; color: var(--text); }
+  .dp-n-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .dp-n-row input[type=number] { width: 52px; padding: 3px 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 12px; text-align: center; -moz-appearance: textfield; }
+  .dp-n-row input::-webkit-inner-spin-button { opacity: 1; }
+  .dp-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .dp-range-preview { font-size: 11px; color: var(--muted); }
+  .dp-range-preview strong { color: var(--text); }
+  .dp-apply { padding: 5px 16px; background: var(--teal); border: none; border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .dp-apply:hover { opacity: .85; }
 
-  #error-banner { display: none; background: #3b1a1a; border: 1px solid #7f2020; color: #fca5a5; padding: 10px 20px; font-size: 13px; }
+  /* Tab bar */
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; background: var(--bg); position: sticky; top: 49px; z-index: 99; }
+  .tab-bar button { padding: 11px 18px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+  .tab-bar button.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .tab-bar button:hover:not(.active) { color: var(--text); }
 
-  main { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
+  /* Error */
+  #error-banner { display: none; background: #3b1a1a; border: 1px solid #7f2020; color: #fca5a5; padding: 8px 24px; font-size: 12px; }
 
-  /* KPI Strip */
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-  .kpi-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  main { padding: 18px 24px; max-width: 1600px; margin: 0 auto; }
+
+  /* Tab goal */
+  .tab-goal { font-size: 12px; color: var(--muted); margin-bottom: 14px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 0 8px 8px 0; }
+  .tab-goal strong { color: var(--text); }
+
+  /* KPI strip */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+  .kpi-value { font-size: 24px; font-weight: 700; line-height: 1; }
   .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-  .kpi-value.green { color: var(--green); }
-  .kpi-value.yellow { color: var(--yellow); }
-  .kpi-value.red { color: var(--red); }
+  .green { color: var(--green) !important; }
+  .yellow { color: var(--yellow) !important; }
+  .red { color: var(--red) !important; }
+  .teal-c { color: var(--teal) !important; }
 
-  /* Charts row */
-  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 20px; }
+  /* Charts */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px; }
   .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 14px; }
-  .chart-wrap { position: relative; height: 220px; }
+  .chart-card h3, .section-card h3 { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+  .chart-wrap { position: relative; height: 210px; }
+  .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .chart-wrap-sm { position: relative; height: 190px; }
 
-  /* Signups chart */
-  .signups-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-  .signups-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 14px; }
-  .signups-wrap { position: relative; height: 200px; }
-
-  /* Tables row */
-  .tables-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  /* Tables */
+  .tables-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; overflow-x: auto; }
-  .table-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-  .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .table-card h3 { font-size: 12px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; font-weight: 600; }
   .badge-meta { background: #1877f220; color: var(--meta); }
   .badge-google { background: #ea433520; color: var(--google); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 6px 10px; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-  td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 5px 8px; color: var(--muted); font-weight: 500; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--border); }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--surface2); }
+  .attr-note { font-size: 11px; color: var(--muted); margin-bottom: 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 
   /* Funnel */
-  .funnel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-  .funnel-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 20px; }
-  .funnel-step { margin-bottom: 14px; }
-  .funnel-step-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-  .funnel-step-name { color: var(--text); }
-  .funnel-step-meta { color: var(--muted); font-size: 12px; }
+  .funnel-step { margin-bottom: 16px; }
+  .funnel-step:last-child { margin-bottom: 0; }
+  .funnel-step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .funnel-step-name { font-size: 12px; font-weight: 500; }
+  .funnel-step-stats { display: flex; gap: 12px; font-size: 11px; }
+  .f-count { color: var(--text); font-weight: 600; }
+  .f-pct { color: var(--muted); }
+  .f-drop { color: var(--red); }
   .funnel-bar-bg { background: var(--surface2); border-radius: 4px; height: 10px; overflow: hidden; }
-  .funnel-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width .5s ease; }
+  .funnel-bar-inner { display: flex; height: 100%; transition: width .5s ease; }
+  .seg-meta   { background: var(--meta); }
+  .seg-google { background: var(--google); }
+  .seg-organic { background: var(--organic); }
+  .seg-direct { background: var(--direct); }
 
-  /* Loading spinner */
-  .loading { display: flex; align-items: center; justify-content: center; height: 100px; color: var(--muted); font-size: 13px; gap: 10px; }
-  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  /* Source breakdown */
+  .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .source-col h4 { font-size: 12px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .src-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .src-dot.meta   { background: var(--meta); }
+  .src-dot.google { background: var(--google); }
+  .src-dot.organic { background: var(--organic); }
+  .src-dot.direct { background: var(--direct); }
+  .mini-step { margin-bottom: 8px; }
+  .mini-step-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: var(--muted); }
+  .mini-step-label strong { color: var(--text); font-weight: 500; }
+  .mini-bar-bg { background: var(--surface2); border-radius: 3px; height: 5px; overflow: hidden; }
+  .mini-bar { height: 100%; border-radius: 3px; transition: width .4s ease; }
+
+  /* Financials */
+  .fin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .fin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .fin-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+  .fin-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .fin-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Status badges */
+  .status-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .status-active   { background: #16532420; color: var(--green); }
+  .status-trialing { background: #78350f20; color: var(--yellow); }
+  .status-canceled { background: #7f202020; color: var(--red); }
+  .status-past_due { background: #7f202020; color: var(--red); }
+
+  /* Filter pills */
+  .filter-pill { padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .filter-pill:hover { color: var(--text); }
+  .filter-pill.active { border-color: var(--teal); color: var(--teal); background: #14b8a618; }
+  .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .filter-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; min-width: 48px; }
+
+  /* Loading */
+  .loading { display: flex; align-items: center; justify-content: center; height: 70px; color: var(--muted); font-size: 12px; gap: 8px; }
+  .spinner { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .no-data { color: var(--muted); padding: 12px; font-size: 12px; }
 
   @media (max-width: 900px) {
-    .charts-row, .tables-row { grid-template-columns: 1fr; }
+    .charts-row, .tables-row, .source-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
+<!-- Login overlay -->
+<div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px 36px; width:340px; box-shadow:0 16px 48px rgba(0,0,0,.6);">
+    <div style="font-size:20px; font-weight:700; margin-bottom:4px;">Overloop <span style="color:var(--accent)">Dashboard</span></div>
+    <div style="font-size:13px; color:var(--muted); margin-bottom:28px;">Enter the password to continue</div>
+    <form id="login-form" onsubmit="submitLogin(event)">
+      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password"
+        style="width:100%; padding:10px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:9px; color:var(--text); font-size:14px; margin-bottom:12px; outline:none;" />
+      <div id="login-error" style="display:none; color:var(--red); font-size:12px; margin-bottom:10px;"></div>
+      <button type="submit" style="width:100%; padding:10px; background:var(--accent); border:none; border-radius:9px; color:#fff; font-size:14px; font-weight:600; cursor:pointer;">Unlock</button>
+    </form>
+  </div>
+</div>
+
 <header>
   <div class="logo">Overloop <span>Dashboard</span></div>
   <div class="header-right">
-    <div class="period-tabs">
-      <button onclick="setPeriod(7)" data-d="7">7d</button>
-      <button onclick="setPeriod(14)" data-d="14" class="active">14d</button>
-      <button onclick="setPeriod(30)" data-d="30">30d</button>
+    <!-- Date range picker -->
+    <div class="dp-wrap" id="dp-wrap">
+      <button class="dp-btn" onclick="togglePicker(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span class="dp-label" id="dp-label">Last week</span>
+        <span class="dp-range" id="dp-range-hdr"></span>
+      </button>
+      <div class="dp-panel" id="dp-panel">
+        <div class="dp-unit-tabs">
+          <button onclick="dpSetUnit('day')"   data-u="day">Days</button>
+          <button onclick="dpSetUnit('week')"  data-u="week" class="active">Weeks</button>
+          <button onclick="dpSetUnit('month')" data-u="month">Months</button>
+        </div>
+        <div class="dp-options" id="dp-options"></div>
+        <div class="dp-footer">
+          <span class="dp-range-preview"><strong id="dp-preview"></strong></span>
+          <button class="dp-apply" onclick="applyPicker()">Apply</button>
+        </div>
+      </div>
     </div>
-    <button class="btn" onclick="refresh()">
+    <div class="divider"></div>
+    <button class="btn" onclick="loadAll()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       Refresh
     </button>
@@ -115,27 +211,52 @@
   </div>
 </header>
 
+<nav class="tab-bar">
+  <button class="active" onclick="switchTab('performance')">Performance</button>
+  <button onclick="switchTab('funnel')">Onboarding</button>
+  <button onclick="switchTab('financials')">Financials</button>
+</nav>
+
 <div id="error-banner"></div>
 
+<!-- ══════════════ PERFORMANCE ══════════════ -->
+<div id="tab-performance" class="tab-panel active">
 <main>
+  <p class="tab-goal"><strong>Goal:</strong> Minimize cost per signup, trial, and activation — see how each paid channel performs and track the trend over time to catch regressions early.</p>
+
   <div class="kpi-grid" id="kpis">
     <div class="loading"><div class="spinner"></div> Loading…</div>
   </div>
 
+  <div class="section-card">
+    <h3>Cost per Outcome — Evolution (Combined paid)</h3>
+    <div class="chart-wrap"><canvas id="costEvolutionChart"></canvas></div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Cost per Outcome — by Period &amp; Channel</h3>
+    <div id="cost-by-period"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Cost per Outcome — Full Period Summary</h3>
+    <div id="cost-by-source"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
   <div class="charts-row">
     <div class="chart-card">
-      <h3>Daily Spend — Meta + Google</h3>
+      <h3>Ad Spend — Meta + Google Ads</h3>
       <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>Channel Split</h3>
+      <h3>Channel Split — Ad Spend Share</h3>
       <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
     </div>
   </div>
 
-  <div class="signups-card">
-    <h3>Signups per Day</h3>
-    <div class="signups-wrap"><canvas id="signupsChart"></canvas></div>
+  <div class="section-card">
+    <h3>Signups per Period — by Source</h3>
+    <div class="chart-wrap-sm"><canvas id="signupsChart"></canvas></div>
   </div>
 
   <div class="tables-row">
@@ -144,189 +265,763 @@
       <div id="meta-table"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="table-card">
-      <h3><span class="badge badge-google">GOOGLE</span> Campaigns</h3>
+      <h3><span class="badge badge-google">GOOGLE ADS</span> Campaigns</h3>
       <div id="google-table"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
 
-  <div class="funnel-card">
-    <h3>Onboarding Funnel</h3>
-    <div id="funnel-steps"><div class="loading"><div class="spinner"></div></div></div>
+  <div class="attr-note">
+    Attribution: Meta = 7d click + 1d view &nbsp;·&nbsp; Google Ads = last click &nbsp;·&nbsp; Signups/Funnel = Metabase (facebook utm → Meta; google utm or _gcl_aw → Google Ads; youtube/trustpilot/etc utm → shown by name; no utm → Organic)
   </div>
 </main>
+</div>
+
+<!-- ══════════════ FUNNEL ══════════════ -->
+<div id="tab-funnel" class="tab-panel">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> Find leaking buckets — which steps lose the most users, and does the drop vary by acquisition channel or device? Fix the highest-drop steps first.</p>
+
+  <div class="section-card">
+    <h3>Funnel Overview — cumulative drop-off, unique by email</h3>
+    <div id="funnel-filters" style="margin-bottom:14px">
+      <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+      <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+    </div>
+    <div id="funnel-steps"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card">
+    <h3>Leaking Buckets by Channel — where does each source drop off?</h3>
+    <div class="source-grid" id="source-grid">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3>Leaking Buckets by Device — parsed from user agent</h3>
+    <div id="device-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Channel Breakdown Table</h3>
+    <div id="source-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card">
+    <h3>Trial Behaviour — 14-day window</h3>
+    <div id="trial-behavior"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
+
+<!-- ══════════════ FINANCIALS ══════════════ -->
+<div id="tab-financials" class="tab-panel">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> Track revenue health and retention — use MRR, ARPU, and LTV to set acquisition spend targets and evaluate channel ROI.</p>
+
+  <div class="fin-grid" id="fin-kpis">
+    <div class="loading"><div class="spinner"></div> Loading…</div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Paying Customers</h3>
+    <div id="fin-paying"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Churn — subscription_status ≠ active, newest first</h3>
+    <div id="fin-churn"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
 
 <script>
-let currentDays = 14;
-let spendChart, donutChart, signupsChart;
+// ── State ──────────────────────────────────────────────────────────────────
+let currentGranularity = 'week';
+let spendChart, donutChart, signupsChart, costEvolutionChart;
 let state = {};
+let funnelFilter = { type: null, value: null }; // type: 'source'|'device', value: key
 
-function fmt$(n) {
-  if (n === null || n === undefined) return '–';
-  if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'k';
-  return '$' + parseFloat(n).toFixed(0);
-}
-function fmtN(n) { return n != null ? parseInt(n).toLocaleString() : '–'; }
-function fmtPct(n) { return n != null ? parseFloat(n).toFixed(2) + '%' : '–'; }
-function fmtCurrency(n) { return n != null ? '$' + parseFloat(n).toFixed(2) : '–'; }
+// Date picker state
+let dp = { unit: 'week', mode: 'last_n', n: 6 };
+let activeSince = '', activeUntil = '';
 
-const chartDefaults = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 12 } } } },
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt$(n)  { if (!n) return '–'; return n >= 1000 ? '$'+(n/1000).toFixed(1)+'k' : '$'+parseFloat(n).toFixed(0); }
+function fmtN(n)  { return n != null ? parseInt(n).toLocaleString('en-US') : '–'; }
+function fmtPct(n){ return n != null ? parseFloat(n).toFixed(1)+'%' : '–'; }
+function fmtCur(n){ return n != null ? '$'+parseFloat(n).toFixed(2) : '–'; }
+
+const CHART_OPTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 11 } } } },
 };
 
-function setPeriod(days) {
-  currentDays = days;
-  document.querySelectorAll('.period-tabs button').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.d) === days);
-  });
-  refresh();
+// ── Source helpers ──────────────────────────────────────────────────────────
+const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustpilot:'#00b67a', organic:'#8b5cf6' };
+const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
+function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
+function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
+// Get all source keys from period data, ordered: meta, google, known, organic last
+function getSources(data) {
+  const all = new Set();
+  for (const d of data) { for (const k of Object.keys(d)) { if (k !== 'date' && k !== 'count') all.add(k); } }
+  const priority = { meta: 0, google: 1, organic: 99 };
+  return [...all].sort((a, b) => (priority[a] ?? 50) - (priority[b] ?? 50) || a.localeCompare(b));
 }
 
-async function refresh() {
+// Plugin: render total spend in the center of doughnut charts
+const donutCenterPlugin = {
+  id: 'donutCenter',
+  beforeDraw(chart) {
+    if (chart.config.type !== 'doughnut') return;
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    const total = (chart.data.datasets[0]?.data || []).reduce((s, v) => s + (v || 0), 0);
+    const cx = (chartArea.left + chartArea.right) / 2;
+    const cy = (chartArea.top  + chartArea.bottom) / 2;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(fmt$(total), cx, cy - 8);
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#7a8ba8';
+    ctx.fillText('total spend', cx, cy + 9);
+    ctx.restore();
+  }
+};
+
+// Aggregate daily data by week or month
+function aggregateByGranularity(dailyArr, gran) {
+  if (gran === 'day') return dailyArr;
+  const map = {};
+  for (const d of dailyArr) {
+    let key;
+    const dt = new Date(d.date + 'T12:00:00'); // noon avoids DST edge cases
+    if (gran === 'week') {
+      const day  = dt.getDay(); // 0=Sun, 1=Mon…
+      const diff = day === 0 ? -6 : 1 - day; // offset to Monday
+      const mon  = new Date(dt);
+      mon.setDate(dt.getDate() + diff);
+      key = iso(mon);
+    } else {
+      key = d.date.slice(0, 7) + '-01';
+    }
+    if (!map[key]) map[key] = { date: key };
+    for (const k of Object.keys(d)) {
+      if (k === 'date') continue;
+      map[key][k] = (map[key][k] || 0) + (d[k] || 0);
+    }
+  }
+  return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ── Date picker ────────────────────────────────────────────────────────────
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fmt_date(d) {
+  return MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate();
+}
+function iso(d) {
+  // Use local date parts — avoids UTC timezone shift from toISOString()
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function calcRange(unit, mode, n) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let since, until;
+
+  if (unit === 'week') {
+    const dow    = today.getDay(); // 0=Sun
+    const toMon  = dow === 0 ? -6 : 1 - dow;
+    const thisMon = new Date(today); thisMon.setDate(today.getDate() + toMon);
+    const thisSun = new Date(thisMon); thisSun.setDate(thisMon.getDate() + 6);
+
+    if (mode === 'previous') {
+      since = new Date(thisMon); since.setDate(thisMon.getDate() - 7);
+      until = new Date(thisMon); until.setDate(thisMon.getDate() - 1);
+    } else if (mode === 'this') {
+      since = thisMon; until = thisSun;
+    } else if (mode === 'next') {
+      since = new Date(thisMon); since.setDate(thisMon.getDate() + 7);
+      until = new Date(since);   until.setDate(since.getDate() + 6);
+    } else if (mode === 'last_n') {
+      // last N weeks = (N-1) complete weeks before this week + current week → until = today
+      since = new Date(thisMon); since.setDate(thisMon.getDate() - (n - 1) * 7);
+      until = today;
+    } else if (mode === 'next_n') {
+      since = new Date(thisMon); since.setDate(thisMon.getDate() + 7);
+      until = new Date(since);   until.setDate(since.getDate() + n * 7 - 1);
+    } else if (mode === 'to_date') {
+      since = thisMon; until = today;
+    }
+  } else if (unit === 'month') {
+    const y = today.getFullYear(), m = today.getMonth();
+
+    if (mode === 'previous') {
+      since = new Date(y, m - 1, 1);
+      until = new Date(y, m, 0);
+    } else if (mode === 'this') {
+      since = new Date(y, m, 1);
+      until = new Date(y, m + 1, 0);
+    } else if (mode === 'next') {
+      since = new Date(y, m + 1, 1);
+      until = new Date(y, m + 2, 0);
+    } else if (mode === 'last_n') {
+      // last N months = (N-1) complete months before this month + current month → until = today
+      since = new Date(y, m - (n - 1), 1);
+      until = today;
+    } else if (mode === 'next_n') {
+      since = new Date(y, m + 1, 1);
+      until = new Date(y, m + 1 + n, 0);
+    } else if (mode === 'to_date') {
+      since = new Date(y, m, 1); until = today;
+    }
+  } else { // day
+    if (mode === 'previous') {
+      since = new Date(today); since.setDate(today.getDate() - 1);
+      until = new Date(since);
+    } else if (mode === 'this') {
+      since = today; until = today;
+    } else if (mode === 'last_n') {
+      // last N days = (N-1) days before today + today → until = today
+      since = new Date(today); since.setDate(today.getDate() - (n - 1));
+      until = today;
+    } else if (mode === 'next_n') {
+      since = new Date(today); since.setDate(today.getDate() + 1);
+      until = new Date(since); until.setDate(since.getDate() + n - 1);
+    } else if (mode === 'to_date') {
+      since = today; until = today;
+    }
+  }
+
+  return { since: iso(since), until: iso(until) };
+}
+
+function dpLabel(unit, mode, n) {
+  const u = unit === 'week' ? 'week' : unit === 'month' ? 'month' : 'day';
+  if (mode === 'previous') return `Previous ${u}`;
+  if (mode === 'this')     return `This ${u}`;
+  if (mode === 'next')     return `Next ${u}`;
+  if (mode === 'last_n')   return `Last ${n} ${u}${n > 1 ? 's' : ''} (incl. current)`;
+  if (mode === 'next_n')   return `Next ${n} ${u}${n > 1 ? 's' : ''}`;
+  if (mode === 'to_date')  return `${u.charAt(0).toUpperCase() + u.slice(1)} to date`;
+  return '';
+}
+
+function updatePreview() {
+  const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
+  const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+  const preview = fmt_date(s) + (since !== until ? ' – ' + fmt_date(u) : '');
+  document.getElementById('dp-preview').textContent = preview;
+}
+
+function buildPickerOptions() {
+  const u = dp.unit;
+  const singular = u === 'week' ? 'week' : u === 'month' ? 'month' : 'day';
+
+  const presets = u === 'day'
+    ? [
+        { mode: 'previous', label: 'Yesterday' },
+        { mode: 'this',     label: 'Today' },
+      ]
+    : [
+        { mode: 'previous', label: `Previous ${singular}` },
+        { mode: 'this',     label: `This ${singular}` },
+        { mode: 'next',     label: `Next ${singular}` },
+      ];
+
+  let leftHtml = '';
+  for (const p of presets) {
+    leftHtml += `<div class="dp-radio">
+      <input type="radio" name="dpmode" id="dp_${p.mode}" value="${p.mode}" ${dp.mode === p.mode ? 'checked' : ''} onchange="dpPickMode('${p.mode}')">
+      <label for="dp_${p.mode}">${p.label}</label>
+    </div>`;
+  }
+
+  const rightHtml = `
+    <div class="dp-radio">
+      <input type="radio" name="dpmode" id="dp_last_n" value="last_n" ${dp.mode === 'last_n' ? 'checked' : ''} onchange="dpPickMode('last_n')">
+      <label for="dp_last_n">
+        <span class="dp-n-row">
+          Last <input type="number" id="dp-n-last" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'last_n')"> ${singular}s
+        </span>
+      </label>
+    </div>
+    <div class="dp-radio">
+      <input type="radio" name="dpmode" id="dp_next_n" value="next_n" ${dp.mode === 'next_n' ? 'checked' : ''} onchange="dpPickMode('next_n')">
+      <label for="dp_next_n">
+        <span class="dp-n-row">
+          Next <input type="number" id="dp-n-next" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'next_n')"> ${singular}s
+        </span>
+      </label>
+    </div>
+    <div class="dp-radio">
+      <input type="radio" name="dpmode" id="dp_to_date" value="to_date" ${dp.mode === 'to_date' ? 'checked' : ''} onchange="dpPickMode('to_date')">
+      <label for="dp_to_date">${singular.charAt(0).toUpperCase() + singular.slice(1)} to date</label>
+    </div>`;
+
+  document.getElementById('dp-options').innerHTML =
+    `<div style="display:flex;flex-direction:column;gap:6px">${leftHtml}</div>` +
+    `<div style="display:flex;flex-direction:column;gap:6px">${rightHtml}</div>`;
+
+  updatePreview();
+}
+
+function togglePicker(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('dp-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) buildPickerOptions();
+}
+
+function dpSetUnit(unit) {
+  dp.unit = unit;
+  dp.mode = 'previous';
+  currentGranularity = unit === 'day' ? 'day' : unit === 'week' ? 'week' : 'month';
+  document.querySelectorAll('[data-u]').forEach(b => b.classList.toggle('active', b.dataset.u === unit));
+  buildPickerOptions();
+}
+
+function dpPickMode(mode) {
+  dp.mode = mode;
+  updatePreview();
+}
+
+function dpSetN(val, mode) {
+  dp.n = Math.max(1, parseInt(val) || 1);
+  if (dp.mode !== mode) { dp.mode = mode; document.getElementById('dp_' + mode).checked = true; }
+  updatePreview();
+}
+
+function applyPicker() {
+  const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
+  activeSince = since; activeUntil = until;
+  currentGranularity = dp.unit === 'day' ? 'day' : dp.unit === 'week' ? 'week' : 'month';
+
+  const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+  document.getElementById('dp-label').textContent = dpLabel(dp.unit, dp.mode, dp.n);
+  document.getElementById('dp-range-hdr').textContent = fmt_date(s) + (since !== until ? ' – ' + fmt_date(u) : '');
+  document.getElementById('dp-panel').classList.remove('open');
+  loadAll();
+}
+
+// Close picker on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('dp-wrap').contains(e.target))
+    document.getElementById('dp-panel').classList.remove('open');
+});
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.tab-bar button[onclick="switchTab('${name}')"]`).classList.add('active');
+}
+
+// ── Main fetch ─────────────────────────────────────────────────────────────
+async function loadAll() {
   const errors = [];
   const base = window.location.origin;
 
-  const [metaRes, googleRes, mbRes] = await Promise.allSettled([
-    fetch(`${base}/api/meta?days=${currentDays}`).then(r => r.json()),
-    fetch(`${base}/api/google?days=${currentDays}`).then(r => r.json()),
-    fetch(`${base}/api/metabase?days=${currentDays}`).then(r => r.json()),
+  const dr = `since=${activeSince}&until=${activeUntil}`;
+  const [mR, gR, mbR] = await Promise.allSettled([
+    fetch(`${base}/api/meta?${dr}`).then(r => r.json()),
+    fetch(`${base}/api/google?${dr}`).then(r => r.json()),
+    fetch(`${base}/api/metabase?${dr}&granularity=${currentGranularity}`).then(r => r.json()),
   ]);
 
-  const meta   = metaRes.status === 'fulfilled' && !metaRes.value.error   ? metaRes.value   : null;
-  const google = googleRes.status === 'fulfilled' && !googleRes.value.error ? googleRes.value : null;
-  const mb     = mbRes.status === 'fulfilled' && !mbRes.value.error       ? mbRes.value     : null;
+  const meta   = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
+  const google = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
+  const mb     = mbR.status === 'fulfilled' && !mbR.value?.error  ? mbR.value  : null;
 
-  if (!meta)   errors.push('Meta: ' + (metaRes.value?.error || metaRes.reason?.message || 'failed'));
-  if (!google) errors.push('Google: ' + (googleRes.value?.error || googleRes.reason?.message || 'failed'));
-  if (!mb)     errors.push('Metabase: ' + (mbRes.value?.error || mbRes.reason?.message || 'failed'));
+  if (!meta)   errors.push('Meta: '   + (mR.value?.error   || mR.reason?.message   || 'failed'));
+  if (!google) errors.push('Google Ads: ' + (gR.value?.error   || gR.reason?.message   || 'failed'));
+  if (!mb)     errors.push('Metabase: '+ (mbR.value?.error || mbR.reason?.message  || 'failed'));
 
   const banner = document.getElementById('error-banner');
-  if (errors.length) {
-    banner.style.display = 'block';
-    banner.textContent = '⚠ Partial data: ' + errors.join(' · ');
-  } else {
-    banner.style.display = 'none';
-  }
+  banner.style.display = errors.length ? 'block' : 'none';
+  if (errors.length) banner.textContent = '⚠ Partial data: ' + errors.join(' · ');
 
   state = { meta, google, mb };
   renderKPIs();
-  renderCharts();
+  renderCostEvolution();
+  renderCostByPeriod();
+  renderCostBySource();
+  renderSpendCharts();
+  renderSignupsChart();
   renderTables();
-  renderFunnel();
-
-  document.getElementById('ts').textContent = 'Last updated: ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  renderFunnelSteps();
+  renderSourceGrid();
+  renderDeviceGrid();
+  renderSourceTable();
+  renderTrialBehavior();
+  renderFinancials();
+  document.getElementById('ts').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+// ══ PERFORMANCE ══════════════════════════════════════════════════════════
+
+// Sum daily data — keeps KPIs and period table consistent
+function dailySpend(src) { return (src?.daily || []).reduce((s, d) => s + (d.spend || 0), 0) || src?.account?.spend || 0; }
 
 function renderKPIs() {
   const { meta, google, mb } = state;
-  const metaSpend = meta?.account?.spend || 0;
-  const googleSpend = google?.account?.spend || 0;
-  const totalSpend = metaSpend + googleSpend;
-  const signups = mb ? mb.signups_daily.reduce((s, d) => s + d.count, 0) : null;
-  const metaLeads = meta?.account?.leads || 0;
-  const googleConv = google?.account?.conversions || 0;
-  const totalLeads = metaLeads + googleConv;
-  const blendedCpl = totalLeads > 0 ? totalSpend / totalLeads : null;
+  const mSpend = dailySpend(meta);
+  const gSpend = dailySpend(google);
+  const tot    = mSpend + gSpend;
+
+  const fbs      = mb?.funnel_by_source || {};
+  const sigs     = mb ? mb.signups_daily.reduce((s, d) => s + d.count, 0) : null;
+  // Paid signups = meta + google signups (users with a paid channel attribution)
+  const metaSig  = fbs.meta?.[0]   || 0;
+  const googleSig= fbs.google?.[0] || 0;
+  const paidSigs = metaSig + googleSig;
+
+  // Paid trialing/active from funnel_by_source (step 8 = trialing index 7, step 9 = active index 8)
+  const paidTrialing = (fbs.meta?.[7] || 0) + (fbs.google?.[7] || 0);
+  const paidActive   = (fbs.meta?.[8] || 0) + (fbs.google?.[8] || 0);
+
+  // % of signups from paid channels
+  const paidPct = sigs > 0 ? Math.round((paidSigs / sigs) * 100) : null;
+
+  // Cost metrics
+  const cpSignup = paidSigs    > 0 ? tot / paidSigs    : null;
+  const cpTrial  = paidTrialing > 0 ? tot / paidTrialing : null;
+  const cpActive = paidActive   > 0 ? tot / paidActive   : null;
 
   const kpis = [
-    { label: 'Total Spend', value: fmt$(totalSpend), cls: '' },
-    { label: 'Meta Spend', value: fmt$(metaSpend), sub: meta ? fmtN(meta.account.impressions) + ' impr' : null },
-    { label: 'Google Spend', value: fmt$(googleSpend), sub: google ? fmtN(google.account.clicks) + ' clicks' : null },
-    { label: 'Signups', value: signups != null ? fmtN(signups) : '–', cls: 'green' },
-    { label: 'Blended CPL', value: blendedCpl ? fmtCurrency(blendedCpl) : '–' },
-    { label: 'Trialing', value: mb ? fmtN(mb.trialing) : '–', cls: 'yellow' },
-    { label: 'Active Paid', value: mb ? fmtN(mb.active_paid) : '–', cls: 'green' },
-    { label: 'Churn', value: mb?.churn > 0 ? fmtN(mb.churn) : '–', cls: mb?.churn > 0 ? 'red' : '' },
+    { l: 'Total Spend',      v: fmt$(tot),                                             s: 'Meta + Google' },
+    { l: 'Meta Spend',       v: fmt$(mSpend),                                          s: meta   ? fmtN(meta.account.impressions)+' impr'  : null, c: '' },
+    { l: 'Google Ads Spend', v: fmt$(gSpend),                                          s: google ? fmtN(google.account.clicks)+' clicks'   : null, c: '' },
+    { l: 'Signups',          v: sigs != null ? fmtN(sigs) : '–',                       s: 'all channels', c: 'green' },
+    { l: 'Paid Signups',     v: fmtN(paidSigs),                                        s: 'meta + google only', c: 'teal-c' },
+    { l: '% Paid Signups',   v: paidPct != null ? paidPct + '%' : '–',                 s: 'paid ÷ all signups', c: 'teal-c' },
+    { l: 'Cost / Signup',    v: cpSignup  ? fmtCur(cpSignup)  : '–',                   s: 'spend ÷ paid signups' },
+    { l: 'Cost / Trial',     v: cpTrial   ? fmtCur(cpTrial)   : '–',                   s: 'spend ÷ paid trialing', c: 'yellow' },
+    { l: 'Cost / Active',    v: cpActive  ? fmtCur(cpActive)  : '–',                   s: 'spend ÷ paid active', c: 'teal-c' },
   ];
 
-  document.getElementById('kpis').innerHTML = kpis.map(k => `
-    <div class="kpi-card">
-      <div class="kpi-label">${k.label}</div>
-      <div class="kpi-value ${k.cls || ''}">${k.value}</div>
-      ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
-    </div>
-  `).join('');
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi-card">
+      <div class="kpi-label">${k.l}</div>
+      <div class="kpi-value ${k.c || ''}">${k.v}</div>
+      ${k.s ? `<div class="kpi-sub">${k.s}</div>` : ''}
+    </div>`
+  ).join('');
 }
 
-function renderCharts() {
+function renderCostEvolution() {
   const { meta, google, mb } = state;
+  if (costEvolutionChart) { costEvolutionChart.destroy(); costEvolutionChart = null; }
+  if (!mb) return;
 
-  // Build daily data merged
-  const dateSet = new Set();
-  (meta?.daily || []).forEach(d => dateSet.add(d.date));
-  (google?.daily || []).forEach(d => dateSet.add(d.date));
-  const dates = [...dateSet].sort();
+  const mDaily    = aggregateByGranularity(meta?.daily   || [], currentGranularity);
+  const gDaily    = aggregateByGranularity(google?.daily || [], currentGranularity);
+  const mByD      = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
+  const gByD      = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
+  const sigsByD   = Object.fromEntries((mb.signups_daily      || []).map(d => [d.date, d]));
+  const trlsByD   = Object.fromEntries((mb.trials_daily       || []).map(d => [d.date, d]));
+  const actsByD   = Object.fromEntries((mb.activations_daily  || []).map(d => [d.date, d]));
+  const hasTrl    = (mb.trials_daily      || []).length > 0;
+  const hasAct    = (mb.activations_daily || []).length > 0;
 
-  const metaByDate = Object.fromEntries((meta?.daily || []).map(d => [d.date, d.spend]));
-  const googleByDate = Object.fromEntries((google?.daily || []).map(d => [d.date, d.spend]));
-  const metaSpends = dates.map(d => metaByDate[d] || 0);
-  const googleSpends = dates.map(d => googleByDate[d] || 0);
-  const shortDates = dates.map(d => d.slice(5)); // MM-DD
+  const allDates = new Set([
+    ...(mb.signups_daily || []).map(d => d.date),
+    ...mDaily.map(d => d.date), ...gDaily.map(d => d.date),
+  ]);
+  const dates = [...allDates].sort();
+  if (dates.length < 2) return;
 
-  // Stacked bar — daily spend
+  const labels = dates.map(d => currentGranularity === 'month' ? d.slice(0,7) : d.slice(5));
+  const cSig = [], cTrl = [], cAct = [];
+  for (const date of dates) {
+    const spend   = (mByD[date]||0) + (gByD[date]||0);
+    const sigs    = sigsByD[date] || {};
+    const paidSig = (sigs.meta||0) + (sigs.google||0);
+    const trl     = ((trlsByD[date]||{}).meta||0) + ((trlsByD[date]||{}).google||0);
+    const act     = ((actsByD[date]||{}).meta||0) + ((actsByD[date]||{}).google||0);
+    cSig.push(spend > 0 && paidSig > 0 ? Math.round(spend / paidSig * 100)/100 : null);
+    cTrl.push(spend > 0 && trl > 0     ? Math.round(spend / trl     * 100)/100 : null);
+    cAct.push(spend > 0 && act > 0     ? Math.round(spend / act     * 100)/100 : null);
+  }
+
+  const datasets = [
+    { label: 'Cost/Signup',  data: cSig, borderColor: '#4f8ef7', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
+    { label: 'Cost/Trial',   data: cTrl, borderColor: '#f59e0b', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
+    { label: 'Cost/Active',  data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, hidden: true },
+  ];
+
+  costEvolutionChart = new Chart(document.getElementById('costEvolutionChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: { ...CHART_OPTS,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+        label: (item) => {
+          const v = item.parsed.y;
+          return v != null ? ` ${item.dataset.label}: $${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
+        }
+      }}},
+      scales: {
+        x: { ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { ticks: { color: '#7a8ba8', callback: v => '$'+v.toFixed(0), font: { size: 10 } }, grid: { color: '#232d44' } },
+      }
+    },
+  });
+}
+
+function renderCostBySource() {
+  const { meta, google, mb } = state;
+  const el = document.getElementById('cost-by-source');
+  if (!meta && !google) { el.innerHTML = '<p class="no-data">No ad data</p>'; return; }
+
+  const mSpend = dailySpend(meta);
+  const gSpend = dailySpend(google);
+  const tot    = mSpend + gSpend;
+
+  const fbs = mb?.funnel_by_source || {};
+  // step indices (0-based): 0=all signups, 7=trialing (step8), 8=active (step9)
+  const metaSig    = fbs.meta?.[0]   || 0;
+  const googleSig  = fbs.google?.[0] || 0;
+  const metaTrial  = fbs.meta?.[7]   || 0;
+  const googleTrial= fbs.google?.[7] || 0;
+  const metaAct    = fbs.meta?.[8]   || 0;
+  const googleAct  = fbs.google?.[8] || 0;
+
+  const rows = [
+    { src: 'Meta',        spend: mSpend, sig: metaSig,              trial: metaTrial,              active: metaAct },
+    { src: 'Google Ads',  spend: gSpend, sig: googleSig,            trial: googleTrial,            active: googleAct },
+    { src: 'Combined',    spend: tot,    sig: metaSig + googleSig,  trial: metaTrial + googleTrial, active: metaAct + googleAct },
+  ];
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Source</th><th>Spend</th>
+      <th>Paid Signups</th><th>Cost/Signup</th>
+      <th>Trialing</th><th>Cost/Trial</th>
+      <th>Active</th><th>Cost/Active</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td style="font-weight:600">${r.src}</td>
+      <td>${fmt$(r.spend)}</td>
+      <td>${fmtN(r.sig)}</td>
+      <td>${r.sig > 0 ? fmtCur(r.spend / r.sig) : '–'}</td>
+      <td>${fmtN(r.trial)}</td>
+      <td>${r.trial > 0 ? fmtCur(r.spend / r.trial) : '–'}</td>
+      <td>${fmtN(r.active)}</td>
+      <td>${r.active > 0 ? fmtCur(r.spend / r.active) : '–'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function renderCostByPeriod() {
+  const { meta, google, mb } = state;
+  const el = document.getElementById('cost-by-period');
+  if (!mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const mDaily    = aggregateByGranularity(meta?.daily   || [], currentGranularity);
+  const gDaily    = aggregateByGranularity(google?.daily || [], currentGranularity);
+  const mSpendByD = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
+  const gSpendByD = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
+
+  const sigsByD = Object.fromEntries((mb.signups_daily     || []).map(d => [d.date, d]));
+  const trlsByD = Object.fromEntries((mb.trials_daily      || []).map(d => [d.date, d]));
+  const actsByD = Object.fromEntries((mb.activations_daily || []).map(d => [d.date, d]));
+
+  const hasTrl = (mb.trials_daily      || []).length > 0;
+  const hasAct = (mb.activations_daily || []).length > 0;
+
+  const allDates = new Set([
+    ...(mb.signups_daily || []).map(d => d.date),
+    ...mDaily.map(d => d.date), ...gDaily.map(d => d.date),
+  ]);
+  const dates = [...allDates].sort(); // ascending — columns left→right
+  if (!dates.length) { el.innerHTML = '<p class="no-data">No data for selected period</p>'; return; }
+
+  const fmtPeriod = d => currentGranularity === 'month' ? d.slice(0, 7) : d.slice(5);
+  const dash = `<span style="color:var(--muted)">–</span>`;
+
+  // Pre-compute per-date data for each platform
+  const byDate = {};
+  for (const date of dates) {
+    const mS = mSpendByD[date] || 0, gS = gSpendByD[date] || 0;
+    const sigs = sigsByD[date] || {}, trls = trlsByD[date] || {}, acts = actsByD[date] || {};
+    // "Organic" = sum of all non-meta/google sources (youtube, trustpilot, organic, etc.)
+    const organicKeys = Object.keys(sigs).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
+    const organicSig  = organicKeys.reduce((s, k) => s + (sigs[k]||0), 0);
+    const organicTrl  = organicKeys.reduce((s, k) => s + (trls[k]||0), 0);
+    const organicAct  = organicKeys.reduce((s, k) => s + (acts[k]||0), 0);
+    byDate[date] = {
+      combined: { spend: mS+gS, sig:(sigs.meta||0)+(sigs.google||0), trl:(trls.meta||0)+(trls.google||0), act:(acts.meta||0)+(acts.google||0) },
+      meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0   },
+      google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0 },
+      organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct     },
+    };
+  }
+
+  // Sections: Combined, Meta, Google Ads, Organic
+  const sections = [
+    { key: 'combined', label: 'Combined (paid)', color: 'var(--teal)',     hasPaid: true  },
+    { key: 'meta',     label: 'Meta',            color: 'var(--meta)',     hasPaid: true  },
+    { key: 'google',   label: 'Google Ads',      color: 'var(--google)',   hasPaid: true  },
+    { key: 'organic',  label: 'Organic',         color: 'var(--organic)',  hasPaid: false },
+  ];
+
+  // Rows per section
+  const allMetrics = [
+    { key: 'spend', label: 'Spend',        paidOnly: true,  fmt: (r) => r.spend > 0 ? fmt$(r.spend) : dash },
+    { key: 'sig',   label: 'Signups',      paidOnly: false, fmt: (r) => fmtN(r.sig) },
+    { key: 'cps',   label: 'Cost/Signup',  paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.sig > 0 ? fmtCur(r.spend/r.sig) : dash },
+    ...(hasTrl ? [
+      { key: 'trl', label: 'Trials',       paidOnly: false, fmt: (r) => fmtN(r.trl) },
+      { key: 'cpt', label: 'Cost/Trial',   paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.trl > 0 ? fmtCur(r.spend/r.trl) : dash },
+    ] : []),
+    ...(hasAct ? [
+      { key: 'act', label: 'Activations',  paidOnly: false, fmt: (r) => fmtN(r.act) },
+      { key: 'cpa', label: 'Cost/Active',  paidOnly: true,  fmt: (r) => r.spend > 0 && r.act > 0 ? fmtCur(r.spend/r.act) : dash },
+    ] : []),
+  ];
+
+  const colSpan = 2 + dates.length;
+  let html = `<table style="font-size:12px">
+    <thead><tr>
+      <th style="min-width:100px">Platform</th>
+      <th style="min-width:80px">Metric</th>
+      ${dates.map(d => `<th style="text-align:right;min-width:68px">${fmtPeriod(d)}</th>`).join('')}
+    </tr></thead><tbody>`;
+
+  for (const sec of sections) {
+    const metrics = allMetrics.filter(m => !m.paidOnly || sec.hasPaid);
+    html += `<tr style="background:var(--surface2)">
+      <td colspan="${colSpan}" style="font-size:11px;font-weight:700;color:${sec.color};text-transform:uppercase;letter-spacing:.5px;padding:5px 8px">${sec.label}</td>
+    </tr>`;
+    for (const m of metrics) {
+      const dim  = !sec.hasPaid ? 'opacity:.6;' : '';
+      const hl   = m.hl ? 'background:rgba(79,142,247,0.06);' : '';
+      const lblSt = m.hl ? 'color:var(--text);font-weight:600;font-size:12px;' : 'color:var(--muted);font-size:11px;';
+      html += `<tr style="${dim}${hl}">
+        <td></td>
+        <td style="${lblSt}padding-left:12px">${m.label}</td>
+        ${dates.map(d => {
+          const v = m.fmt(byDate[d][sec.key]);
+          const valSt = m.hl ? 'font-weight:600;' : '';
+          return `<td style="text-align:right;${valSt}">${v}</td>`;
+        }).join('')}
+      </tr>`;
+    }
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderSpendCharts() {
+  const { meta, google } = state;
+  const mDaily = aggregateByGranularity(meta?.daily   || [], currentGranularity);
+  const gDaily = aggregateByGranularity(google?.daily || [], currentGranularity);
+
+  const dateSet = new Set([...mDaily.map(d => d.date), ...gDaily.map(d => d.date)]);
+  const dates   = [...dateSet].sort();
+  const mByD    = Object.fromEntries(mDaily.map(d => [d.date, d.spend]));
+  const gByD    = Object.fromEntries(gDaily.map(d => [d.date, d.spend]));
+  const labels  = dates.map(d => currentGranularity === 'month' ? d.slice(0, 7) : d.slice(5));
+
   if (spendChart) spendChart.destroy();
   spendChart = new Chart(document.getElementById('spendChart'), {
     type: 'bar',
     data: {
-      labels: shortDates,
+      labels,
       datasets: [
-        { label: 'Meta', data: metaSpends, backgroundColor: '#1877f2cc', stack: 'spend' },
-        { label: 'Google', data: googleSpends, backgroundColor: '#ea4335cc', stack: 'spend' },
+        { label: 'Meta',       data: dates.map(d => mByD[d] || 0), backgroundColor: '#1877f2cc', stack: 's' },
+        { label: 'Google Ads', data: dates.map(d => gByD[d] || 0), backgroundColor: '#ea4335cc', stack: 's' },
       ],
     },
-    options: {
-      ...chartDefaults,
+    options: { ...CHART_OPTS,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+        footer: (items) => {
+          const total = items.reduce((s, i) => s + i.parsed.y, 0);
+          return `Total: $${total.toFixed(0)}`;
+        }
+      }}},
       scales: {
-        x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45 }, grid: { color: '#232d44' } },
-        y: { stacked: true, ticks: { color: '#7a8ba8', callback: v => '$' + v }, grid: { color: '#232d44' } },
-      },
+        x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { stacked: true, ticks: { color: '#7a8ba8', callback: v => '$'+v, font: { size: 10 } }, grid: { color: '#232d44' } },
+      }
     },
   });
 
-  // Donut — channel split
-  const metaTotal = meta?.account?.spend || 0;
-  const googleTotal = google?.account?.spend || 0;
   if (donutChart) donutChart.destroy();
+  const mS = dailySpend(meta), gS = dailySpend(google);
+  const donutTotal = mS + gS;
   donutChart = new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
     data: {
-      labels: ['Meta', 'Google'],
-      datasets: [{ data: [metaTotal, googleTotal], backgroundColor: ['#1877f2', '#ea4335'], borderWidth: 0 }],
+      labels: ['Meta', 'Google Ads'],
+      datasets: [{ data: [mS, gS], backgroundColor: ['#1877f2', '#ea4335'], borderWidth: 0 }],
     },
+    plugins: [donutCenterPlugin],
     options: {
-      ...chartDefaults,
+      ...CHART_OPTS,
       cutout: '68%',
       plugins: {
-        legend: { position: 'bottom', labels: { color: '#7a8ba8', padding: 16 } },
-      },
+        tooltip: { callbacks: {
+          label: (item) => {
+            const pct = donutTotal > 0 ? Math.round((item.parsed / donutTotal) * 100) : 0;
+            return ` ${item.label}: ${fmt$(item.parsed)} (${pct}%)`;
+          }
+        }},
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#7a8ba8', padding: 12, font: { size: 11 },
+            generateLabels: (chart) => {
+              const vals = chart.data.datasets[0].data;
+              const tot = vals.reduce((s, v) => s + (v || 0), 0);
+              return chart.data.labels.map((lbl, i) => ({
+                text: `${lbl}  ${tot > 0 ? Math.round((vals[i] / tot) * 100) : 0}%`,
+                fillStyle: chart.data.datasets[0].backgroundColor[i],
+                strokeStyle: chart.data.datasets[0].backgroundColor[i],
+                lineWidth: 0, index: i,
+              }));
+            }
+          }
+        }
+      }
     },
   });
+}
 
-  // Line — signups per day
-  const signupDates = (mb?.signups_daily || []).map(d => d.date?.slice(5) || d.date);
-  const signupCounts = (mb?.signups_daily || []).map(d => d.count);
+function renderSignupsChart() {
+  const { mb } = state;
+  const data = aggregateByGranularity(mb?.signups_daily || [], currentGranularity);
+  const labels = data.map(d => currentGranularity === 'month' ? d.date.slice(0, 7) : d.date.slice(5));
+
+  const srcs = getSources(data);
   if (signupsChart) signupsChart.destroy();
   signupsChart = new Chart(document.getElementById('signupsChart'), {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: signupDates,
-      datasets: [{
-        label: 'Signups',
-        data: signupCounts,
-        borderColor: '#4f8ef7',
-        backgroundColor: '#4f8ef720',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-      }],
+      labels,
+      datasets: srcs.map(s => ({ label: srcLabel(s), data: data.map(d => d[s]||0), backgroundColor: srcColor(s)+'cc', stack: 's' })),
     },
-    options: {
-      ...chartDefaults,
+    options: { ...CHART_OPTS,
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+        footer: (items) => {
+          const total = items.reduce((s, i) => s + i.parsed.y, 0);
+          return `Total: ${total}`;
+        }
+      }}},
       scales: {
-        x: { ticks: { color: '#7a8ba8', maxRotation: 45 }, grid: { color: '#232d44' } },
-        y: { ticks: { color: '#7a8ba8' }, grid: { color: '#232d44' } },
-      },
+        x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { stacked: true, ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+      }
     },
   });
 }
@@ -334,76 +1029,485 @@ function renderCharts() {
 function renderTables() {
   const { meta, google } = state;
 
-  // Meta table
-  const metaEl = document.getElementById('meta-table');
-  if (!meta) {
-    metaEl.innerHTML = '<p style="color:var(--muted);padding:12px">No data</p>';
-  } else {
-    metaEl.innerHTML = `<table>
-      <thead><tr><th>Campaign</th><th>Spend</th><th>Leads</th><th>CPL</th><th>CTR</th></tr></thead>
-      <tbody>${(meta.campaigns || []).map(c => `
-        <tr>
-          <td>${c.name}</td>
-          <td>${fmt$(c.spend)}</td>
-          <td>${fmtN(c.leads)}</td>
-          <td>${fmtCurrency(c.cpl)}</td>
-          <td>${fmtPct(c.ctr)}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
-  }
+  const mEl = document.getElementById('meta-table');
+  mEl.innerHTML = !meta ? '<p class="no-data">No data</p>' :
+    `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Leads</th><th>CPL</th><th>CTR</th></tr></thead>
+    <tbody>${(meta.campaigns || []).map(c =>
+      `<tr><td>${c.name}</td><td>${fmt$(c.spend)}</td><td>${fmtN(c.leads)}</td><td>${fmtCur(c.cpl)}</td><td>${fmtPct(c.ctr)}</td></tr>`
+    ).join('')}</tbody></table>`;
 
-  // Google table
-  const googleEl = document.getElementById('google-table');
-  if (!google) {
-    googleEl.innerHTML = '<p style="color:var(--muted);padding:12px">No data</p>';
-  } else {
-    googleEl.innerHTML = `<table>
-      <thead><tr><th>Campaign</th><th>Spend</th><th>Conv.</th><th>CPA</th><th>Clicks</th></tr></thead>
-      <tbody>${(google.campaigns || []).map(c => `
-        <tr>
-          <td>${c.name}</td>
-          <td>${fmt$(c.spend)}</td>
-          <td>${parseFloat(c.conversions).toFixed(1)}</td>
-          <td>${fmtCurrency(c.cpa)}</td>
-          <td>${fmtN(c.clicks)}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
-  }
+  const gEl = document.getElementById('google-table');
+  gEl.innerHTML = !google ? '<p class="no-data">No data</p>' :
+    `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Conv.</th><th>CPA</th><th>Clicks</th></tr></thead>
+    <tbody>${(google.campaigns || []).map(c =>
+      `<tr><td>${c.name}</td><td>${fmt$(c.spend)}</td><td>${parseFloat(c.conversions||0).toFixed(1)}</td><td>${fmtCur(c.cpa)}</td><td>${fmtN(c.clicks)}</td></tr>`
+    ).join('')}</tbody></table>`;
 }
 
-function renderFunnel() {
+// ══ FUNNEL ════════════════════════════════════════════════════════════════
+
+function setFunnelFilter(type, value) {
+  if (funnelFilter.type === type && funnelFilter.value === value) {
+    funnelFilter = { type: null, value: null };
+  } else {
+    funnelFilter = { type, value };
+  }
+  renderFunnelFilters();
+  renderFunnelSteps();
+}
+
+function renderFunnelFilters() {
+  const { mb } = state;
+  if (!mb) return;
+  const fbs = mb.funnel_by_source || {};
+  const fbd = mb.funnel_by_device || {};
+
+  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
+  document.getElementById('funnel-src-pills').innerHTML =
+    ['all', ...srcKeys].map(s => {
+      const isAll = s === 'all';
+      const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'source' && funnelFilter.value === s);
+      const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('source','${s}')`;
+      const lbl    = isAll ? 'All' : srcLabel(s);
+      const n      = isAll ? '' : ` <span style="opacity:.6">${fmtN(fbs[s]?.[0]||0)}</span>`;
+      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}${n}</button>`;
+    }).join('');
+
+  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
+  document.getElementById('funnel-dev-pills').innerHTML = devKeys.length
+    ? ['all', ...devKeys].map(d => {
+        const isAll = d === 'all';
+        const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'device' && funnelFilter.value === d);
+        const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('device','${d}')`;
+        const lbl    = isAll ? 'All' : (d.charAt(0).toUpperCase() + d.slice(1));
+        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}</button>`;
+      }).join('')
+    : '<span style="font-size:11px;color:var(--muted)">loading…</span>';
+}
+
+function renderFunnelSteps() {
   const { mb } = state;
   const el = document.getElementById('funnel-steps');
-  if (!mb) { el.innerHTML = '<p style="color:var(--muted);padding:12px">No data</p>'; return; }
+  if (!mb?.funnel?.steps) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const f = mb.funnel;
-  const steps = [
-    { key: 'signups', label: 'Signups' },
-    { key: 'email_confirmed', label: 'Email Confirmed' },
-    { key: 'campaign_wizard', label: 'Campaign Wizard' },
-    { key: 'plan_selected', label: 'Plan Selected' },
-    { key: 'finished', label: 'Finished Onboarding' },
+  renderFunnelFilters();
+
+  // Pick steps array based on active filter
+  let steps;
+  if (funnelFilter.type === 'source') {
+    steps = mb.funnel_by_source?.[funnelFilter.value] || mb.funnel.steps;
+  } else if (funnelFilter.type === 'device') {
+    steps = mb.funnel_by_device?.[funnelFilter.value] || mb.funnel.steps;
+  } else {
+    steps = mb.funnel.steps;
+  }
+
+  const total = steps[0] || 1;
+  // Only show source bar segments when no filter is active
+  const fbs = funnelFilter.type === null ? (mb.funnel_by_source || {}) : {};
+
+  const rows = [
+    { label: 'Step 1 — Signup',               val: steps[0], idx: 0 },
+    { label: 'Step 2 — Campaign Wizard',      val: steps[1], idx: 1 },
+    { label: 'Step 3 — Accounts',             val: steps[2], idx: 2 },
+    { label: 'Step 4 — Pitch Index',          val: steps[3], idx: 3 },
+    { label: 'Step 5 — Editor',               val: steps[4], idx: 4 },
+    { label: 'Step 6 — Prospects',            val: steps[5], idx: 5 },
+    { label: 'Step 7 — Congrats',             val: steps[6], idx: 6 },
+    { label: 'Step 8 — Trial',                val: steps[7], idx: 7 },
+    { label: 'Step 9 — Active',               val: steps[8], idx: 8 },
   ];
-  const max = f.signups || 1;
 
-  el.innerHTML = steps.map((s, i) => {
-    const val = f[s.key] || 0;
-    const pct = Math.round((val / max) * 100);
-    const dropPct = i > 0 ? Math.round(((f[steps[i-1].key] - val) / (f[steps[i-1].key] || 1)) * 100) : null;
+  el.innerHTML = rows.map((row, i) => {
+    const val      = row.val || 0;
+    const prevVal  = i === 0 ? total : (rows[i - 1].val || 1);
+    const pctTotal = Math.round((val / total) * 100);
+    const dropPct  = i > 0 ? Math.round(((prevVal - val) / prevVal) * 100) : null;
+
+    // Bar fill: solid color when filtered, multi-source segments when unfiltered
+    let barInner;
+    if (funnelFilter.type === null) {
+      // No filter — segmented by source
+      let mW = pctTotal, gW = 0, oW = 0; // fallback: solid accent
+      if (row.idx !== null) {
+        const mV = fbs.meta?.[row.idx]   || 0;
+        const gV = fbs.google?.[row.idx] || 0;
+        const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google')
+                    .reduce((s, k) => s + (fbs[k]?.[row.idx] || 0), 0);
+        const srcTot = mV + gV + oV || 1;
+        mW = (mV / srcTot) * pctTotal;
+        gW = (gV / srcTot) * pctTotal;
+        oW = (oV / srcTot) * pctTotal;
+      }
+      barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
+    } else {
+      // Filter active — single solid bar
+      const color = funnelFilter.type === 'source'
+        ? srcColor(funnelFilter.value)
+        : { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' }[funnelFilter.value] || '#94a3b8';
+      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+    }
+
     return `<div class="funnel-step">
       <div class="funnel-step-header">
-        <span class="funnel-step-name">${s.label}</span>
-        <span class="funnel-step-meta">${fmtN(val)} (${pct}%)${dropPct !== null ? ` · <span style="color:var(--red)">-${dropPct}%</span>` : ''}</span>
+        <span class="funnel-step-name">${row.label}</span>
+        <div class="funnel-step-stats">
+          <span class="f-count">${fmtN(val)}</span>
+          <span class="f-pct">${pctTotal}% of total</span>
+          ${dropPct !== null ? `<span class="f-drop">↓ ${dropPct}% from prev</span>` : ''}
+        </div>
       </div>
-      <div class="funnel-bar-bg"><div class="funnel-bar" style="width:${pct}%"></div></div>
+      <div class="funnel-bar-bg">
+        <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
+      </div>
     </div>`;
   }).join('');
 }
 
-// Auto-load on page open
-refresh();
+function renderSourceGrid() {
+  const { mb } = state;
+  const el = document.getElementById('source-grid');
+  if (!mb?.funnel_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const fbs = mb.funnel_by_source;
+  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
+  const stepLabels = [
+    'Signup', 'Campaign Wizard', 'Accounts', 'Pitch Index',
+    'Editor', 'Prospects', 'Congrats', 'Trial', 'Active',
+  ];
+  // Update grid columns dynamically
+  el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
+
+  el.innerHTML = srcKeys.map(key => {
+    const vals  = fbs[key] || [];
+    const base  = vals[0] || 1;
+    const color = srcColor(key);
+    return `<div class="source-col">
+      <h4><span class="src-dot" style="background:${color}"></span>${srcLabel(key)} <span style="color:var(--muted);font-weight:400">${fmtN(vals[0] || 0)}</span></h4>
+      ${stepLabels.map((label, i) => {
+        const v   = vals[i] || 0;
+        const pct = Math.round((v / base) * 100);
+        const drop = i > 0 ? Math.round(((vals[i-1]||0) - v) / (vals[i-1]||1) * 100) : null;
+        const dropBadge = drop > 0 ? `<span style="color:var(--red);font-size:10px;margin-left:4px">↓${drop}%</span>` : '';
+        return `<div class="mini-step">
+          <div class="mini-step-label">
+            <span>${label}${dropBadge}</span>
+            <strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span>
+          </div>
+          <div class="mini-bar-bg"><div class="mini-bar" style="width:${pct}%;background:${color}"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderSourceTable() {
+  const { mb } = state;
+  const el = document.getElementById('source-table');
+  if (!mb?.funnel_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const fbs = mb.funnel_by_source;
+  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
+  const sources = srcKeys.map(k => ({ key: k, label: srcLabel(k) }));
+
+  const rows = sources.map(({ key, label }) => {
+    const v        = fbs[key] || [];
+    const signups  = v[0] || 0;
+    const wizard   = v[1] || 0;
+    const congrats = v[6] || 0;
+    const trialing = v[7] || 0;
+    const active   = v[8] || 0;
+    const rTrial  = signups > 0 ? ((trialing / signups) * 100).toFixed(1) + '%' : '–';
+    const rActive = signups > 0 ? ((active   / signups) * 100).toFixed(1) + '%' : '–';
+    return `<tr>
+      <td>${label}</td>
+      <td>${fmtN(signups)}</td>
+      <td>${fmtN(wizard)}</td>
+      <td>${fmtN(congrats)}</td>
+      <td>${fmtN(trialing)}</td>
+      <td>${fmtN(active)}</td>
+      <td>${rTrial}</td>
+      <td>${rActive}</td>
+    </tr>`;
+  });
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Source</th><th>Signups</th><th>Wizard</th><th>Congrats</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Signup→Active</th>
+    </tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>`;
+}
+
+function renderDeviceGrid() {
+  const { mb } = state;
+  const el = document.getElementById('device-grid');
+  if (!el) return;
+  const fbd = mb?.funnel_by_device;
+  if (!fbd || Object.keys(fbd).length === 0) {
+    el.innerHTML = '<p class="no-data">No device data</p>';
+    return;
+  }
+  if (fbd._error) {
+    el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`;
+    return;
+  }
+
+  const DEVICE_COLOR = { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' };
+  const stepLabels   = ['Signup','Campaign Wizard','Accounts','Pitch Index','Editor','Prospects','Congrats','Trial','Active'];
+
+  const devices = Object.entries(fbd).sort((a, b) => (b[1][0]||0) - (a[1][0]||0));
+  el.innerHTML = devices.map(([device, vals]) => {
+    const color = DEVICE_COLOR[device] || '#94a3b8';
+    const base  = vals[0] || 1;
+    return `<div class="source-col">
+      <h4><span class="src-dot" style="background:${color}"></span>${device} <span style="color:var(--muted);font-weight:400">${fmtN(vals[0]||0)}</span></h4>
+      ${stepLabels.map((label, i) => {
+        const v   = vals[i] || 0;
+        const pct = Math.round((v / base) * 100);
+        const drop = i > 0 ? Math.round(((vals[i-1]||0) - v) / (vals[i-1]||1) * 100) : null;
+        const dropBadge = drop !== null && drop > 0 ? `<span style="color:var(--red);font-size:10px;margin-left:4px">↓${drop}%</span>` : '';
+        return `<div class="mini-step">
+          <div class="mini-step-label">
+            <span>${label}${dropBadge}</span>
+            <strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span>
+          </div>
+          <div class="mini-bar-bg"><div class="mini-bar" style="width:${pct}%;background:${color}"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderTrialBehavior() {
+  const { mb } = state;
+  const el = document.getElementById('trial-behavior');
+  if (!el) return;
+  const tb = mb?.trial_behavior;
+  if (!tb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const fmtDays = v => v != null ? parseFloat(v).toFixed(1) + ' days' : '–';
+
+  // Per-source avg signup→trial rows
+  const srcMap = tb.avg_signup_to_trial_by_source || {};
+  const srcOrder = ['meta', 'google', 'organic'];
+  const otherSrcs = Object.keys(srcMap).filter(k => !srcOrder.includes(k));
+  const allSrcs = [...srcOrder, ...otherSrcs].filter(k => srcMap[k] != null);
+  const srcRows = allSrcs.map(k =>
+    `<tr><td style="padding:4px 8px;color:var(--muted)">${srcLabel(k)}</td><td style="padding:4px 8px;font-weight:600">${fmtDays(srcMap[k])}</td></tr>`
+  ).join('');
+
+  el.innerHTML = `<div class="fin-grid" style="margin:0 0 16px">
+    <div class="fin-card">
+      <div class="fin-label">Avg: Signup → Trial</div>
+      <div class="fin-value">${fmtDays(tb.avg_days_signup_to_trial)}</div>
+      <div class="fin-sub">avg days from signup to trial_start</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">Avg: Trial → Active</div>
+      <div class="fin-value">${fmtDays(tb.avg_days_trial_to_active)}</div>
+      <div class="fin-sub">avg days from trial_start to subscribed_at (active only)</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">Past 14d — Not Active</div>
+      <div class="fin-value ${tb.over_14d_not_active > 0 ? 'red' : ''}">${fmtN(tb.over_14d_not_active)}</div>
+      <div class="fin-sub">&gt;14 days since trial_start, status ≠ active</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">In 14d Window</div>
+      <div class="fin-value yellow">${fmtN(tb.in_14d_window)}</div>
+      <div class="fin-sub">currently within 14 days since trial_start</div>
+    </div>
+  </div>
+  ${allSrcs.length ? `
+  <div style="margin-top:4px">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Avg Signup → Trial by channel</div>
+    <table style="border-collapse:collapse;font-size:12px">${srcRows}</table>
+  </div>` : ''}`;
+}
+
+// ══ FINANCIALS ════════════════════════════════════════════════════════════
+
+function renderFinancials() {
+  const { meta, google, mb } = state;
+  const fin = mb?.financials || {};
+  const el  = document.getElementById('fin-kpis');
+
+  if (!mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const mSpend = meta?.account?.spend || 0;
+  const gSpend = google?.account?.spend || 0;
+  const totalSpend = mSpend + gSpend;
+
+  const arpu = fin.arpu || 0;
+  const ltv  = fin.ltv;
+  const cac  = fin.active_paid > 0 ? totalSpend / fin.active_paid : null;
+  const ltvCacRatio = cac && ltv ? (ltv / cac).toFixed(1) : null;
+  const payback = arpu > 0 && cac ? (cac / arpu).toFixed(1) : null;
+
+  const tenureNote = fin.avg_tenure_months
+    ? `avg churned tenure ${fin.avg_tenure_months}mo`
+    : 'no churn data yet';
+
+  const cards = [
+    { l: 'MRR',              v: fin.mrr ? '$'+fmtN(fin.mrr) : '–',
+      s: 'sum of active subscriptions (current)', c: 'teal-c' },
+    { l: 'Active Paid',      v: fmtN(fin.active_paid),
+      s: 'current self-service customers', c: 'green' },
+    { l: 'Trialing',         v: fmtN(fin.trialing),
+      s: 'currently in free trial', c: 'yellow' },
+    { l: 'Trial → Active',   v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–',
+      s: 'active ÷ (active+trialing) — current',
+      c: fin.trial_to_active_rate > 20 ? 'green' : 'yellow' },
+    { l: 'Churn Rate',       v: fin.churn_rate != null ? fin.churn_rate + '%' : '–',
+      s: 'churned ÷ (active+churned) — lifetime', c: fin.churn > 0 ? 'red' : '' },
+    { l: 'ARPU',             v: arpu ? fmtCur(arpu) : '–',
+      s: 'MRR ÷ active customers — monthly', c: '' },
+    { l: 'LTV (est.)',       v: ltv ? '$'+fmtN(ltv) : '–',
+      s: `ARPU × ${tenureNote}`, c: 'teal-c' },
+    { l: 'LTV : CAC',        v: ltvCacRatio ? ltvCacRatio + 'x' : '–',
+      s: 'LTV ÷ (period spend ÷ active) — target >3x',
+      c: ltvCacRatio > 3 ? 'green' : ltvCacRatio > 1 ? 'yellow' : 'red' },
+    { l: 'Payback Period',   v: payback ? payback + ' mo' : '–',
+      s: 'CAC ÷ ARPU — months to recover acquisition cost', c: '' },
+    { l: 'Churn Count',      v: fmtN(fin.churn || 0),
+      s: 'all-time status ≠ active', c: fin.churn > 0 ? 'red' : '' },
+    { l: 'Avg: Signup → Active', v: fin.avg_days_signup_to_active != null ? parseFloat(fin.avg_days_signup_to_active).toFixed(1) + ' days' : '–',
+      s: 'all-time avg days from signup to subscribed_at', c: '' },
+  ];
+
+  el.innerHTML = cards.map(c =>
+    `<div class="fin-card">
+      <div class="fin-label">${c.l}</div>
+      <div class="fin-value ${c.c || ''}">${c.v}</div>
+      <div class="fin-sub">${c.s}</div>
+    </div>`
+  ).join('');
+
+  // Paying customers table
+  const payEl = document.getElementById('fin-paying');
+  const paying = fin.paying_customers || [];
+  if (!paying.length) {
+    payEl.innerHTML = '<p class="no-data">No active subscriptions found</p>';
+  } else {
+    payEl.innerHTML = `<table>
+      <thead><tr><th>Company</th><th>Email</th><th>Started</th><th>Plan</th><th>MRR</th><th>Seats</th><th>Source</th></tr></thead>
+      <tbody>${paying.map(c =>
+        `<tr>
+          <td>${c.company || '–'}</td>
+          <td style="color:var(--muted)">${c.email || '–'}</td>
+          <td>${c.started_at || '–'}</td>
+          <td>${c.plan || '–'}</td>
+          <td>$${(c.mrr||0).toFixed(0)}</td>
+          <td>${c.seats ?? '–'}</td>
+          <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
+        </tr>`
+      ).join('')}</tbody>
+    </table>`;
+  }
+
+  // Churn table
+  const churnEl = document.getElementById('fin-churn');
+  const churnList = fin.churn_list || [];
+  if (!churnList.length) {
+    churnEl.innerHTML = '<p class="no-data">No churned subscriptions found</p>';
+  } else {
+    churnEl.innerHTML = `<table>
+      <thead><tr><th>Company</th><th>Email</th><th>Sub Started</th><th>Status</th><th>Plan</th><th>MRR</th><th>Source</th></tr></thead>
+      <tbody>${churnList.map(c =>
+        `<tr>
+          <td>${c.company || '–'}</td>
+          <td style="color:var(--muted)">${c.email || '–'}</td>
+          <td>${c.started_at || '–'}</td>
+          <td><span class="status-badge status-${c.status}">${c.status}</span></td>
+          <td>${c.plan || '–'}</td>
+          <td>${c.mrr ? '$'+(c.mrr).toFixed(0) : '–'}</td>
+          <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
+        </tr>`
+      ).join('')}</tbody>
+    </table>`;
+  }
+}
+
+// Init default: previous week
+(function initDefault() {
+  dp = { unit: 'week', mode: 'last_n', n: 4 };
+  // Auth check — show login overlay if not authenticated
+  async function initDashboard() {
+    try {
+      const r = await fetch('/api/check-auth');
+      if (r.ok) {
+        startDashboard();
+      } else {
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('login-password').focus();
+      }
+    } catch {
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.getElementById('login-password').focus();
+    }
+  }
+
+  function startDashboard() {
+    document.getElementById('login-overlay').style.display = 'none';
+    currentGranularity = 'week';
+    const { since, until } = calcRange('week', 'last_n', 4);
+    activeSince = since; activeUntil = until;
+    const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+    document.getElementById('dp-label').textContent = 'Last 4 weeks';
+    document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+    loadAll();
+    scheduleAutoRefresh();
+  }
+
+  initDashboard();
+})();
+
+async function submitLogin(event) {
+  event.preventDefault();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try {
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (r.ok) {
+      // Re-run dashboard init now that we're authenticated
+      document.getElementById('login-overlay').style.display = 'none';
+      (() => {
+        currentGranularity = 'week';
+        const { since, until } = calcRange('week', 'last_n', 4);
+        activeSince = since; activeUntil = until;
+        const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+        document.getElementById('dp-label').textContent = 'Last 4 weeks';
+        document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+        loadAll();
+        scheduleAutoRefresh();
+      })();
+    } else {
+      errEl.textContent = 'Wrong password. Try again.';
+      errEl.style.display = 'block';
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-password').focus();
+    }
+  } catch {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
+// Auto-refresh at 6:00 AM local time every day (tab must be open)
+function scheduleAutoRefresh() {
+  const now  = new Date();
+  const next = new Date();
+  next.setHours(6, 0, 0, 0);
+  if (now >= next) next.setDate(next.getDate() + 1);
+  const ms = next - now;
+  setTimeout(() => { loadAll(); scheduleAutoRefresh(); }, ms);
+}
 </script>
 </body>
 </html>
