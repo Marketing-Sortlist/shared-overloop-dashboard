@@ -1,13 +1,12 @@
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const META_ACCOUNT_ID = process.env.META_ACCOUNT_ID;
 const API_VERSION = 'v19.0';
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
 
-function getDateRange(req) {
-  if (req.query.since && req.query.until) {
-    return { since: req.query.since, until: req.query.until };
+function getDateRange(url) {
+  const params = url.searchParams;
+  if (params.get('since') && params.get('until')) {
+    return { since: params.get('since'), until: params.get('until') };
   }
-  const days = parseInt(req.query.days) || 14;
+  const days = parseInt(params.get('days')) || 14;
   const until = new Date();
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -26,20 +25,23 @@ function timeRange(since, until) {
   return encodeURIComponent(JSON.stringify({ since, until }));
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+export async function onRequest(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
 
-  const { since, until } = getDateRange(req);
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  }
 
-  const token = META_ACCESS_TOKEN;
-  const accountId = META_ACCOUNT_ID;
+  const { since, until } = getDateRange(url);
+
+  const token = env.META_ACCESS_TOKEN;
+  const accountId = env.META_ACCOUNT_ID;
   const fields = 'spend,impressions,clicks,ctr,cpm,cpc,actions,cost_per_action_type';
   const attrWindows = 'action_attribution_windows=%5B%227d_click%22%2C%221d_view%22%5D';
   const tr = timeRange(since, until);
 
   try {
-    // Account-level: single aggregated row — most reliable source for total spend
     const accountData = await fetchJson(
       `${BASE}/${accountId}/insights?fields=${fields}&time_range=${tr}&${attrWindows}&access_token=${token}`
     );
@@ -47,7 +49,6 @@ export default async function handler(req, res) {
     const leads = (acc.actions || []).find(a => a.action_type === 'lead')?.value || 0;
     const spend = parseFloat(acc.spend || 0);
 
-    // Campaign-level: limit=500 avoids default 25-row pagination
     const campaignData = await fetchJson(
       `${BASE}/${accountId}/insights?fields=campaign_id,campaign_name,${fields}&time_range=${tr}&level=campaign&limit=500&${attrWindows}&access_token=${token}`
     );
@@ -68,7 +69,6 @@ export default async function handler(req, res) {
       };
     });
 
-    // Daily breakdown: limit=500 avoids default 25-row pagination (90-day range = 90 rows max)
     const dailyData = await fetchJson(
       `${BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions&time_range=${tr}&time_increment=1&limit=500&${attrWindows}&access_token=${token}`
     );
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       leads: parseInt((d.actions || []).find(a => a.action_type === 'lead')?.value || 0),
     }));
 
-    res.json({
+    return Response.json({
       account: {
         spend,
         impressions: parseInt(acc.impressions || 0),
@@ -93,8 +93,8 @@ export default async function handler(req, res) {
       },
       campaigns: campaignInsights,
       daily,
-    });
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return Response.json({ error: err.message }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }

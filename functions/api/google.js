@@ -1,18 +1,11 @@
-const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-const CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
-const LOGIN_CUSTOMER_ID = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
-
-async function getAccessToken() {
+async function getAccessToken(env) {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      refresh_token: REFRESH_TOKEN,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      refresh_token: env.GOOGLE_REFRESH_TOKEN,
       grant_type: 'refresh_token',
     }),
   });
@@ -21,11 +14,12 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-function getDateRange(req) {
-  if (req.query.since && req.query.until) {
-    return { since: req.query.since, until: req.query.until };
+function getDateRange(url) {
+  const params = url.searchParams;
+  if (params.get('since') && params.get('until')) {
+    return { since: params.get('since'), until: params.get('until') };
   }
-  const days = parseInt(req.query.days) || 14;
+  const days = parseInt(params.get('days')) || 14;
   const until = new Date();
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -33,14 +27,18 @@ function getDateRange(req) {
   return { since: fmt(since), until: fmt(until) };
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+export async function onRequest(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
 
-  const { since, until } = getDateRange(req);
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  }
+
+  const { since, until } = getDateRange(url);
 
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(env);
 
     const query = `
       SELECT
@@ -57,13 +55,13 @@ export default async function handler(req, res) {
     `;
 
     const response = await fetch(
-      `https://googleads.googleapis.com/v20/customers/${CUSTOMER_ID}/googleAds:searchStream`,
+      `https://googleads.googleapis.com/v20/customers/${env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'developer-token': DEVELOPER_TOKEN,
-          'login-customer-id': LOGIN_CUSTOMER_ID,
+          'developer-token': env.GOOGLE_ADS_DEVELOPER_TOKEN,
+          'login-customer-id': env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
@@ -83,10 +81,8 @@ export default async function handler(req, res) {
       throw new Error(JSON.stringify(results));
     }
 
-    // Flatten all rows from streaming response
     const rows = results.flatMap(r => r.results || []);
 
-    // Aggregate by campaign
     const campaignMap = {};
     const dailyMap = {};
 
@@ -129,7 +125,7 @@ export default async function handler(req, res) {
       conversions: acc.conversions + c.conversions,
     }), { spend: 0, clicks: 0, conversions: 0 });
 
-    res.json({
+    return Response.json({
       account: {
         spend: totals.spend,
         clicks: totals.clicks,
@@ -139,8 +135,8 @@ export default async function handler(req, res) {
       },
       campaigns,
       daily,
-    });
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return Response.json({ error: err.message }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }

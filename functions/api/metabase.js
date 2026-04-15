@@ -1,11 +1,9 @@
-const METABASE_URL = process.env.METABASE_URL;
-const METABASE_API_KEY = process.env.METABASE_API_KEY;
 const DB_ID = 5;
 
-async function runSQL(sql) {
-  const res = await fetch(`${METABASE_URL}/api/dataset`, {
+async function runSQL(env, sql) {
+  const res = await fetch(`${env.METABASE_URL}/api/dataset`, {
     method: 'POST',
-    headers: { 'x-api-key': METABASE_API_KEY, 'Content-Type': 'application/json' },
+    headers: { 'x-api-key': env.METABASE_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ database: DB_ID, type: 'native', native: { query: sql } }),
   });
   if (!res.ok) throw new Error(`Dataset API ${res.status}: ${await res.text()}`);
@@ -14,10 +12,10 @@ async function runSQL(sql) {
   return data?.data?.rows || [];
 }
 
-async function runCard(cardId) {
-  const res = await fetch(`${METABASE_URL}/api/card/${cardId}/query`, {
+async function runCard(env, cardId) {
+  const res = await fetch(`${env.METABASE_URL}/api/card/${cardId}/query`, {
     method: 'POST',
-    headers: { 'x-api-key': METABASE_API_KEY, 'Content-Type': 'application/json' },
+    headers: { 'x-api-key': env.METABASE_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
   if (!res.ok) return [];
@@ -25,14 +23,15 @@ async function runCard(cardId) {
   return data?.data?.rows || [];
 }
 
-function getDateRange(req) {
+function getDateRange(url) {
+  const params = url.searchParams;
   const fmt = (d) => d.toISOString().split('T')[0];
   let since, until;
-  if (req.query.since && req.query.until) {
-    since = req.query.since;
-    until = req.query.until;
+  if (params.get('since') && params.get('until')) {
+    since = params.get('since');
+    until = params.get('until');
   } else {
-    const days = parseInt(req.query.days) || 14;
+    const days = parseInt(params.get('days')) || 14;
     const u = new Date(); const s = new Date();
     s.setDate(s.getDate() - days);
     since = fmt(s); until = fmt(u);
@@ -42,7 +41,6 @@ function getDateRange(req) {
   return { since, until, until1: fmt(u1) };
 }
 
-// Source attribution: facebook→meta, (google OR _gcl_aw)→google, known utm→utm_source value, no utm→organic
 const SOURCE_CASE = `
   CASE
     WHEN LOWER(COALESCE(substring(companies.signup_url, 'utm_source=([^&]*)'), '')) = 'facebook' THEN 'meta'
@@ -54,8 +52,6 @@ const SOURCE_CASE = `
   END
 `;
 
-// Step assignment SQL expression (1–9, higher = further in funnel)
-// Fields: u.current_signup_step, u.last_campaign_wizard_step, sub.status
 const STEP_CASE = `
   CASE
     WHEN u.current_signup_step = 'finished'
@@ -78,7 +74,6 @@ const STEP_CASE = `
   END
 `;
 
-// Exclude internal Sortlist/Overloop accounts from all queries
 const INTERNAL_FILTER = `
   AND u.email NOT ILIKE '%sortlist.com%'
   AND u.email NOT ILIKE '%overloop%'
@@ -98,16 +93,20 @@ function buildPeriodMap(rows) {
   return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+export async function onRequest(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
 
-  const granularity = ['day', 'week', 'month'].includes(req.query.granularity) ? req.query.granularity : 'day';
-  const { since, until1 } = getDateRange(req);
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*' } });
+  }
+
+  const granularity = ['day', 'week', 'month'].includes(url.searchParams.get('granularity')) ? url.searchParams.get('granularity') : 'day';
+  const { since, until1 } = getDateRange(url);
 
   try {
-    // ── 1. Signups grouped by period + source ────────────────────────────────
-    const dailyRows = await runSQL(`
+    // 1. Signups grouped by period + source
+    const dailyRows = await runSQL(env, `
       SELECT
         DATE_TRUNC('${granularity}', companies.created_at)::date AS period,
         ${SOURCE_CASE} AS source,
@@ -123,8 +122,8 @@ export default async function handler(req, res) {
     `);
     const signups_daily = buildPeriodMap(dailyRows);
 
-    // ── 2. Funnel — cumulative counts by step (1–9), deduplicated by email ───
-    const funnelRows = await runSQL(`
+    // 2. Funnel
+    const funnelRows = await runSQL(env, `
       WITH raw AS (
         SELECT
           u.email,
@@ -169,10 +168,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 3. Funnel by device type ──────────────────────────────────────────────
+    // 3. Funnel by device type
     let funnelByDevice = {};
     try {
-      const deviceRows = await runSQL(`
+      const deviceRows = await runSQL(env, `
         WITH raw AS (
           SELECT
             u.email,
@@ -217,12 +216,10 @@ export default async function handler(req, res) {
       }
     } catch (e) { funnelByDevice = { _error: e.message }; }
 
-    // ── 4. Per-period funnel — trials (step≥8) and actives (step≥9) per signup cohort
-    // Uses signup date to attribute: "how many users who signed up in week X are now trialing/active?"
-    // This ties ad spend for a week to outcomes from that week's cohort — no extra column names needed.
+    // 4. Per-period funnel
     let trials_daily = [], activations_daily = [];
     try {
-      const periodFunnelRows = await runSQL(`
+      const periodFunnelRows = await runSQL(env, `
         WITH raw AS (
           SELECT
             DATE_TRUNC('${granularity}', companies.created_at)::date AS period,
@@ -266,12 +263,11 @@ export default async function handler(req, res) {
       activations_daily = Object.values(aMap).sort((x, y) => x.date.localeCompare(y.date));
     } catch (_) { /* trials/activations_daily stay empty */ }
 
-    // ── 5. Trial behaviour — avg conversion times + 14-day trial window stats ─
-    // Scoped to the selected signup cohort (companies.created_at in range).
+    // 5. Trial behaviour
     let trial_behavior = null;
     try {
       const [tbRows, tbSrcRows] = await Promise.all([
-        runSQL(`
+        runSQL(env, `
           SELECT
             ROUND(AVG(EXTRACT(EPOCH FROM (sub.trial_start - companies.created_at)) / 86400)::numeric, 1)
               AS avg_days_signup_to_trial,
@@ -297,7 +293,7 @@ export default async function handler(req, res) {
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
           ${INTERNAL_FILTER}
         `),
-        runSQL(`
+        runSQL(env, `
           SELECT
             ${SOURCE_CASE} AS source,
             ROUND(AVG(EXTRACT(EPOCH FROM (sub.trial_start - companies.created_at)) / 86400)::numeric, 1)
@@ -332,12 +328,8 @@ export default async function handler(req, res) {
       }
     } catch (_) { /* trial_behavior stays null */ }
 
-    // ── 6. Card 769 — all self-service subscriptions ─────────────────────────
-    // Cols: 0:company_id 1:company_name 2:company_created_at 3:user_id 4:user_email
-    //       5:subscription_status 6:subscription_started_at 7:current_price
-    //       8:unit_amount 9:commitment_months 10:seats 11:mrr 12:total_spent
-    //      13:signup_url 14:utm_source
-    const subRows = await runCard(769);
+    // 6. Card 769 — all self-service subscriptions
+    const subRows = await runCard(env, 769);
 
     const utmToSource = (utm) => {
       if (!utm) return 'Organic';
@@ -376,14 +368,14 @@ export default async function handler(req, res) {
     const mrr         = payingCustomers.reduce((s, r) => s + r.mrr, 0);
     const active_paid = payingCustomers.length;
 
-    // ── 7. Card 670 — current trials ─────────────────────────────────────────
-    const trialRows2 = await runCard(670);
+    // 7. Card 670 — current trials
+    const trialRows2 = await runCard(env, 670);
     const trialing   = trialRows2.length;
 
-    // ── 7b. Avg days signup → active (all-time, not date-filtered) ───────────
+    // 7b. Avg days signup → active
     let avg_days_signup_to_active = null;
     try {
-      const saRows = await runSQL(`
+      const saRows = await runSQL(env, `
         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (sub.subscribed_at - companies.created_at)) / 86400)::numeric, 1)
         FROM companies
         LEFT JOIN LATERAL (
@@ -401,15 +393,13 @@ export default async function handler(req, res) {
       if (saRows[0]?.[0] != null) avg_days_signup_to_active = Number(saRows[0][0]);
     } catch (_) {}
 
-    // ── 8. Financial metrics ──────────────────────────────────────────────────
+    // 8. Financial metrics
     const churn_count = churnList.length;
-    // Lifetime churn rate: % of all customers who have ever churned
     const churn_rate = (active_paid + churn_count) > 0
       ? Math.round((churn_count / (active_paid + churn_count)) * 1000) / 10
       : 0;
     const arpu = active_paid > 0 ? Math.round((mrr / active_paid) * 100) / 100 : 0;
 
-    // Average tenure of churned customers in months (observed lifespan proxy)
     const nowMs = Date.now();
     const tenures = churnList
       .filter(r => r.started_at)
@@ -417,18 +407,17 @@ export default async function handler(req, res) {
     const avg_tenure_months = tenures.length > 0
       ? Math.round((tenures.reduce((s, v) => s + v, 0) / tenures.length) * 10) / 10
       : null;
-    // LTV = ARPU × avg observed lifespan of churned customers
     const ltv = avg_tenure_months != null && arpu > 0
       ? Math.round(arpu * avg_tenure_months)
       : null;
 
-    res.json({
+    return Response.json({
       granularity,
       signups_daily,
       trials_daily,
       activations_daily,
       funnel: {
-        steps: totalsFinal,   // [s1…s9] cumulative counts
+        steps: totalsFinal,
         total: totalsFinal[0] || 0,
       },
       funnel_by_source: funnelBySource,
@@ -442,19 +431,19 @@ export default async function handler(req, res) {
         active_paid,
         mrr:    Math.round(mrr),
         churn:  churn_count,
-        churn_rate,               // % — lifetime
-        arpu,                     // $/month per active customer
-        ltv,                      // $ — ARPU × avg churned tenure
-        avg_tenure_months,        // months
-        avg_days_signup_to_active,// days — all-time avg signup→subscribed_at for active customers
+        churn_rate,
+        arpu,
+        ltv,
+        avg_tenure_months,
+        avg_days_signup_to_active,
         trial_to_active_rate: (active_paid + trialing) > 0
           ? Math.round((active_paid / (active_paid + trialing)) * 100)
           : 0,
         paying_customers: payingCustomers,
         churn_list:       churnList,
       },
-    });
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return Response.json({ error: err.message }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }

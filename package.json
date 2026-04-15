@@ -1,7 +1,11 @@
 {
   "name": "overloop-dashboard",
   "version": "1.0.0",
-  "engines": {
-    "node": "20.x"
+  "scripts": {
+    "dev": "npx wrangler pages dev .",
+    "deploy": "npx wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "wrangler": "^3"
   }
 }
