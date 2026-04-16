@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Overloop — Organic</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0b0f1a; --surface: #131929; --surface2: #1a2236; --border: #232d44;
+    --text: #e2e8f0; --muted: #7a8ba8; --accent: #4f8ef7; --green: #22c55e;
+    --red: #ef4444; --yellow: #f59e0b; --organic: #8b5cf6; --teal: #14b8a6;
+    --clicks: #8b5cf6; --impr: #3b82f6; --ctr: #14b8a6; --pos: #f59e0b;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; }
+
+  /* Header */
+  header { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; background: var(--bg); }
+  .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
+  .logo span { color: var(--organic); }
+  .back-link { font-size: 12px; color: var(--muted); text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+  .back-link:hover { color: var(--text); background: var(--surface2); }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 5px; transition: background .15s; }
+  .btn:hover { background: var(--surface2); }
+  .timestamp { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .divider { width: 1px; height: 20px; background: var(--border); }
+
+  /* Date picker */
+  .dp-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .dp-btn:hover { background: var(--surface2); }
+  .dp-btn .dp-label { color: var(--accent); font-weight: 600; }
+  .dp-btn .dp-range { color: var(--muted); font-size: 11px; }
+  .dp-panel { display: none; position: absolute; top: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: 420px; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .dp-panel.open { display: block; }
+  .dp-wrap { position: relative; }
+  .dp-unit-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .dp-unit-tabs button { padding: 6px 14px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .dp-unit-tabs button.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .dp-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .dp-radio { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; padding: 4px 0; }
+  .dp-radio input[type=radio] { accent-color: var(--teal); width: 14px; height: 14px; cursor: pointer; }
+  .dp-radio label { cursor: pointer; color: var(--text); }
+  .dp-n-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .dp-n-row input[type=number] { width: 52px; padding: 3px 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 12px; text-align: center; -moz-appearance: textfield; }
+  .dp-n-row input::-webkit-inner-spin-button { opacity: 1; }
+  .dp-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .dp-range-preview { font-size: 11px; color: var(--muted); }
+  .dp-range-preview strong { color: var(--text); }
+  .dp-apply { padding: 5px 16px; background: var(--teal); border: none; border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .dp-apply:hover { opacity: .85; }
+
+  /* Tab bar */
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; background: var(--bg); position: sticky; top: 49px; z-index: 99; }
+  .tab-bar button { padding: 11px 18px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+  .tab-bar button.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .tab-bar button:hover:not(.active) { color: var(--text); }
+
+  /* Error */
+  #error-banner { display: none; background: #3b1a1a; border: 1px solid #7f2020; color: #fca5a5; padding: 8px 24px; font-size: 12px; }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  main { padding: 18px 24px; max-width: 1600px; margin: 0 auto; }
+
+  /* Goal note */
+  .tab-goal { font-size: 12px; color: var(--muted); margin-bottom: 14px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--organic); border-radius: 0 8px 8px 0; }
+  .tab-goal strong { color: var(--text); }
+
+  /* KPIs */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+  .kpi-value { font-size: 24px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .green  { color: var(--green) !important; }
+  .yellow { color: var(--yellow) !important; }
+  .red    { color: var(--red) !important; }
+  .purple { color: var(--organic) !important; }
+  .teal-c { color: var(--teal) !important; }
+
+  /* Charts */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .chart-card h3, .section-card h3 { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+  .chart-wrap { position: relative; height: 210px; }
+  .chart-wrap-sm { position: relative; height: 180px; }
+  .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+
+  /* Tables */
+  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; overflow-x: auto; }
+  .table-card h3 { font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 5px 8px; color: var(--muted); font-weight: 500; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .td-url { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-size: 11px; }
+  .td-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .pos-top10  { background: #16532420; color: var(--green); }
+  .pos-top20  { background: #78350f20; color: var(--yellow); }
+  .pos-below  { background: #23232340; color: var(--muted); }
+
+  /* Status badges */
+  .status-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .status-active   { background: #16532420; color: var(--green); }
+  .status-trialing { background: #78350f20; color: var(--yellow); }
+  .status-none     { background: #23232340; color: var(--muted); }
+  .status-canceled { background: #7f202020; color: var(--red); }
+
+  /* GA4 placeholder */
+  .placeholder-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; display: flex; align-items: center; gap: 16px; }
+  .placeholder-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
+  .placeholder-text h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .placeholder-text p  { font-size: 12px; color: var(--muted); }
+
+  /* Loading */
+  .loading { display: flex; align-items: center; justify-content: center; height: 70px; color: var(--muted); font-size: 12px; gap: 8px; }
+  .spinner { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .no-data { color: var(--muted); padding: 12px; font-size: 12px; }
+
+  /* Login overlay */
+  #login-overlay { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 9999; align-items: center; justify-content: center; }
+
+  @media (max-width: 900px) {
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login overlay -->
+<div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px 36px; width:340px; box-shadow:0 16px 48px rgba(0,0,0,.6);">
+    <div style="font-size:20px; font-weight:700; margin-bottom:4px;">Overloop <span style="color:var(--organic)">Organic</span></div>
+    <div style="font-size:13px; color:var(--muted); margin-bottom:28px;">Enter the password to continue</div>
+    <form id="login-form" onsubmit="submitLogin(event)">
+      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password"
+        style="width:100%; padding:10px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:9px; color:var(--text); font-size:14px; margin-bottom:12px; outline:none;" />
+      <div id="login-error" style="display:none; color:var(--red); font-size:12px; margin-bottom:10px;"></div>
+      <button type="submit" style="width:100%; padding:10px; background:var(--organic); border:none; border-radius:9px; color:#fff; font-size:14px; font-weight:600; cursor:pointer;">Unlock</button>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <a href="/" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Dashboard
+    </a>
+    <div class="logo">Overloop <span>Organic</span></div>
+  </div>
+  <div class="header-right">
+    <div class="dp-wrap" id="dp-wrap">
+      <button class="dp-btn" onclick="togglePicker(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span class="dp-label" id="dp-label">Last 4 weeks</span>
+        <span class="dp-range" id="dp-range-hdr"></span>
+      </button>
+      <div class="dp-panel" id="dp-panel">
+        <div class="dp-unit-tabs">
+          <button onclick="dpSetUnit('day')"   data-u="day">Days</button>
+          <button onclick="dpSetUnit('week')"  data-u="week" class="active">Weeks</button>
+          <button onclick="dpSetUnit('month')" data-u="month">Months</button>
+        </div>
+        <div class="dp-options" id="dp-options"></div>
+        <div class="dp-footer">
+          <span class="dp-range-preview"><strong id="dp-preview"></strong></span>
+          <button class="dp-apply" onclick="applyPicker()">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <button class="btn" onclick="loadAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Refresh
+    </button>
+    <span class="timestamp" id="ts">–</span>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <button class="active" onclick="switchTab('overview')">Overview</button>
+  <button onclick="switchTab('queries')">Search Queries</button>
+  <button onclick="switchTab('pages')">Landing Pages</button>
+</nav>
+
+<div id="error-banner"></div>
+
+<!-- ══ OVERVIEW ══ -->
+<div id="tab-overview" class="tab-panel active">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> Understand how organic search drives real business outcomes — track the full funnel from impressions → clicks → organic signups → trials → activations.</p>
+
+  <div class="kpi-grid" id="kpis">
+    <div class="loading"><div class="spinner"></div> Loading…</div>
+  </div>
+
+  <div class="section-card">
+    <h3>Organic Traffic — Clicks &amp; Impressions (weekly)</h3>
+    <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>CTR Evolution (weekly avg)</h3>
+      <div class="chart-wrap"><canvas id="ctrChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Avg Position Evolution (weekly avg)</h3>
+      <div class="chart-wrap"><canvas id="posChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3>Organic Leads — by Subscription Status (weekly)</h3>
+    <div class="chart-wrap"><canvas id="leadsChart"></canvas></div>
+  </div>
+
+  <!-- GA4 placeholder -->
+  <div class="placeholder-card">
+    <div class="placeholder-icon">📊</div>
+    <div class="placeholder-text">
+      <h4>Demo Page Funnel — coming soon</h4>
+      <p>GA4 access pending setup. Will show sessions on /demo, /book-demo, /book-demo-calendar, /demo-booked per week once the Google Analytics Data API is enabled on the service account.</p>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ══ QUERIES ══ -->
+<div id="tab-queries" class="tab-panel">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> Identify which search queries drive the most organic clicks to overloop.com — spot intent patterns and find queries worth optimizing.</p>
+  <div class="table-card">
+    <h3>Top Search Queries — by Clicks</h3>
+    <div id="queries-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
+
+<!-- ══ PAGES ══ -->
+<div id="tab-pages" class="tab-panel">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> See which landing pages capture the most organic traffic — identify top performers and pages with high impressions but low CTR to improve.</p>
+  <div class="table-card">
+    <h3>Top Landing Pages — by Clicks</h3>
+    <div id="pages-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let state = { gsc: null, leads: null };
+let trafficChart, ctrChart, posChart, leadsChart;
+let dp = { unit: 'week', mode: 'last_n', n: 4 };
+let activeSince = '', activeUntil = '';
+let currentTab = 'overview';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const fmtK  = n => n == null ? '–' : n >= 1000 ? (n/1000).toFixed(1)+'k' : n.toLocaleString('en-US');
+const fmtN  = n => n == null ? '–' : parseInt(n).toLocaleString('en-US');
+const fmtPct= n => n == null ? '–' : (parseFloat(n)*100).toFixed(1)+'%';
+const fmtPos= n => n == null ? '–' : parseFloat(n).toFixed(1);
+
+const CHART_OPTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 11 } } } },
+};
+
+function fmt_date(d) {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+// ── Week aggregation for GSC daily data ──────────────────────────────────────
+function mondayOf(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon…
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function aggregateGSCByWeek(daily) {
+  const weeks = {};
+  for (const row of daily) {
+    const w = mondayOf(row.date);
+    if (!weeks[w]) weeks[w] = { date: w, clicks: 0, impressions: 0, _posSum: 0, _posImpr: 0, _days: 0 };
+    weeks[w].clicks      += row.clicks;
+    weeks[w].impressions += row.impressions;
+    weeks[w]._posSum     += row.position * row.impressions;
+    weeks[w]._posImpr    += row.impressions;
+    weeks[w]._days++;
+  }
+  return Object.values(weeks)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(w => ({
+      date:        w.date,
+      clicks:      w.clicks,
+      impressions: w.impressions,
+      ctr:         w.impressions > 0 ? w.clicks / w.impressions : 0,
+      position:    w._posImpr > 0 ? w._posSum / w._posImpr : 0,
+    }));
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.tab-bar button[onclick="switchTab('${name}')"]`).classList.add('active');
+  renderAll();
+}
+
+// ── Date picker ────────────────────────────────────────────────────────────────
+function calcRange(unit, mode, n, since, until) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const pad = s => String(s).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  if (mode === 'since_until') return { since, until };
+
+  const dayMs = 86400000;
+  let s, u;
+
+  if (unit === 'day') {
+    u = new Date(today - dayMs);
+    s = new Date(u - (n-1)*dayMs);
+  } else if (unit === 'week') {
+    const dow = today.getDay();
+    const thisMon = new Date(today - ((dow===0?6:dow-1))*dayMs);
+    const lastMon = new Date(thisMon - 7*dayMs);
+    u = new Date(lastMon.getTime() + 6*dayMs);
+    s = new Date(lastMon.getTime() - (n-1)*7*dayMs);
+  } else {
+    const y = today.getFullYear(), m = today.getMonth();
+    const lastM = m === 0 ? { y: y-1, m: 11 } : { y, m: m-1 };
+    u = new Date(lastM.y, lastM.m+1, 0);
+    s = new Date(lastM.y, lastM.m - (n-1), 1);
+  }
+  return { since: fmt(s), until: fmt(u) };
+}
+
+function dpSetUnit(u) {
+  dp.unit = u; dp.mode = 'last_n'; dp.n = 4;
+  document.querySelectorAll('[data-u]').forEach(b => b.classList.toggle('active', b.dataset.u === u));
+  renderDpOptions();
+}
+
+const DP_PRESETS = {
+  week:  [['Last week','last_n',1],['Last 4 weeks','last_n',4],['Last 8 weeks','last_n',8],['Last 12 weeks','last_n',12],['Last 16 weeks','last_n',16],['Last 26 weeks','last_n',26]],
+  day:   [['Last 7 days','last_n',7],['Last 14 days','last_n',14],['Last 30 days','last_n',30],['Last 60 days','last_n',60],['Last 90 days','last_n',90]],
+  month: [['Last month','last_n',1],['Last 3 months','last_n',3],['Last 6 months','last_n',6],['Last 12 months','last_n',12]],
+};
+
+function renderDpOptions() {
+  const presets = DP_PRESETS[dp.unit] || [];
+  const isN = dp.mode === 'last_n';
+  document.getElementById('dp-options').innerHTML = presets.map(([label, mode, n]) => {
+    const checked = isN && dp.n === n ? 'checked' : '';
+    return `<label class="dp-radio"><input type="radio" name="dp" ${checked} onchange="dp.mode='last_n';dp.n=${n};updateDpPreview()"><label>${label}</label></label>`;
+  }).join('') +
+  `<div class="dp-n-row" style="grid-column:1/-1;margin-top:4px">
+    <span style="color:var(--muted)">Last</span>
+    <input type="number" min="1" max="52" value="${isN ? dp.n : 4}" oninput="dp.mode='last_n';dp.n=parseInt(this.value)||1;updateDpPreview()">
+    <span style="color:var(--muted)">${dp.unit}s</span>
+  </div>`;
+  updateDpPreview();
+}
+
+function updateDpPreview() {
+  const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
+  const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+  document.getElementById('dp-preview').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+}
+
+function togglePicker(e) {
+  e.stopPropagation();
+  document.getElementById('dp-panel').classList.toggle('open');
+  renderDpOptions();
+}
+document.addEventListener('click', () => document.getElementById('dp-panel').classList.remove('open'));
+
+function applyPicker() {
+  const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
+  activeSince = since; activeUntil = until;
+  const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+  const label = dp.mode === 'last_n'
+    ? (dp.n === 1 ? `Last ${dp.unit}` : `Last ${dp.n} ${dp.unit}s`)
+    : 'Custom';
+  document.getElementById('dp-label').textContent = label;
+  document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+  document.getElementById('dp-panel').classList.remove('open');
+  loadAll();
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const banner = document.getElementById('error-banner');
+  banner.style.display = 'none';
+  const dr = `since=${activeSince}&until=${activeUntil}`;
+  document.getElementById('ts').textContent = '…';
+
+  const [gscRes, leadsRes] = await Promise.allSettled([
+    fetch(`/api/gsc?${dr}`).then(r => r.json()),
+    fetch(`/api/organic-leads?${dr}`).then(r => r.json()),
+  ]);
+
+  const errors = [];
+  state.gsc   = gscRes.status === 'fulfilled' && !gscRes.value.error   ? gscRes.value   : null;
+  state.leads = leadsRes.status === 'fulfilled' && !leadsRes.value.error ? leadsRes.value : null;
+  if (!state.gsc)   errors.push('GSC: ' + (gscRes.value?.error || gscRes.reason?.message || 'failed'));
+  if (!state.leads) errors.push('Leads: ' + (leadsRes.value?.error || leadsRes.reason?.message || 'failed'));
+  if (errors.length) { banner.textContent = '⚠ ' + errors.join(' · '); banner.style.display = 'block'; }
+
+  document.getElementById('ts').textContent = new Date().toLocaleTimeString();
+  renderAll();
+}
+
+function renderAll() {
+  renderKPIs();
+  if (currentTab === 'overview') {
+    renderTrafficChart();
+    renderCTRChart();
+    renderPositionChart();
+    renderLeadsChart();
+  } else if (currentTab === 'queries') {
+    renderQueriesTable();
+  } else if (currentTab === 'pages') {
+    renderPagesTable();
+  }
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const el = document.getElementById('kpis');
+  const g = state.gsc;
+  const l = state.leads;
+
+  const totalClicks  = g ? g.daily.reduce((s, r) => s + r.clicks, 0) : null;
+  const totalImpr    = g ? g.daily.reduce((s, r) => s + r.impressions, 0) : null;
+  const avgCTR       = totalClicks != null && totalImpr > 0 ? totalClicks / totalImpr : null;
+  const avgPos       = g && totalImpr > 0
+    ? g.daily.reduce((s, r) => s + r.position * r.impressions, 0) / totalImpr : null;
+
+  const totalSignups = l ? Object.values(l.totals).reduce((s, v) => s + v, 0) : null;
+  const totTrialing  = l ? (l.totals.trialing || 0) : null;
+  const totActive    = l ? (l.totals.active || 0) : null;
+  const totNone      = l ? (l.totals.none || 0) : null;
+
+  el.innerHTML = [
+    { label: 'Organic Clicks',   value: fmtK(totalClicks),    sub: 'total in period',              cls: 'purple' },
+    { label: 'Impressions',      value: fmtK(totalImpr),      sub: 'total in period',              cls: '' },
+    { label: 'Avg CTR',          value: fmtPct(avgCTR),       sub: 'clicks ÷ impressions',         cls: avgCTR > 0.04 ? 'green' : avgCTR > 0.02 ? 'yellow' : 'red' },
+    { label: 'Avg Position',     value: fmtPos(avgPos),       sub: 'weighted by impressions',      cls: avgPos && avgPos < 10 ? 'green' : avgPos < 20 ? 'yellow' : '' },
+    { label: 'Organic Signups',  value: fmtN(totalSignups),   sub: 'no utm_source or gclid',       cls: 'teal-c' },
+    { label: 'Trialing',         value: fmtN(totTrialing),    sub: 'currently in free trial',      cls: 'yellow' },
+    { label: 'Active',           value: fmtN(totActive),      sub: 'converted to paid',            cls: 'green' },
+    { label: 'Not Started',      value: fmtN(totNone),        sub: 'stuck in signup flow',         cls: '' },
+  ].map(k => `<div class="kpi-card">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value ${k.cls}">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+}
+
+// ── Traffic chart (clicks + impressions, weekly) ──────────────────────────────
+function renderTrafficChart() {
+  const el = document.getElementById('trafficChart');
+  if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
+
+  const weekly = aggregateGSCByWeek(state.gsc.daily);
+  const labels = weekly.map(w => w.date.slice(5));
+
+  if (trafficChart) trafficChart.destroy();
+  trafficChart = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Clicks',
+          data: weekly.map(w => w.clicks),
+          backgroundColor: '#8b5cf6cc',
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Impressions',
+          data: weekly.map(w => w.impressions),
+          type: 'line',
+          borderColor: '#3b82f6',
+          backgroundColor: 'transparent',
+          pointRadius: 3,
+          borderWidth: 2,
+          tension: 0.3,
+          yAxisID: 'y2',
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      ...CHART_OPTS,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x:  { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y:  { position: 'left',  ticks: { color: '#8b5cf6', font: { size: 10 } }, grid: { color: '#232d44' } },
+        y2: { position: 'right', ticks: { color: '#3b82f6', font: { size: 10 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+// ── CTR chart ─────────────────────────────────────────────────────────────────
+function renderCTRChart() {
+  const el = document.getElementById('ctrChart');
+  if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
+
+  const weekly = aggregateGSCByWeek(state.gsc.daily);
+  const labels = weekly.map(w => w.date.slice(5));
+
+  if (ctrChart) ctrChart.destroy();
+  ctrChart = new Chart(el, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'CTR %',
+        data: weekly.map(w => +(w.ctr * 100).toFixed(2)),
+        borderColor: '#14b8a6',
+        backgroundColor: '#14b8a620',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      ...CHART_OPTS,
+      scales: {
+        x: { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { ticks: { color: '#7a8ba8', callback: v => v+'%', font: { size: 10 } }, grid: { color: '#232d44' } },
+      },
+    },
+  });
+}
+
+// ── Position chart ────────────────────────────────────────────────────────────
+function renderPositionChart() {
+  const el = document.getElementById('posChart');
+  if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
+
+  const weekly = aggregateGSCByWeek(state.gsc.daily);
+  const labels = weekly.map(w => w.date.slice(5));
+
+  if (posChart) posChart.destroy();
+  posChart = new Chart(el, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Avg Position',
+        data: weekly.map(w => +w.position.toFixed(1)),
+        borderColor: '#f59e0b',
+        backgroundColor: '#f59e0b20',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      ...CHART_OPTS,
+      scales: {
+        x: { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: {
+          reverse: true,
+          ticks: { color: '#7a8ba8', font: { size: 10 } },
+          grid: { color: '#232d44' },
+          title: { display: true, text: 'lower = better', color: '#7a8ba8', font: { size: 10 } },
+        },
+      },
+    },
+  });
+}
+
+// ── Leads chart ───────────────────────────────────────────────────────────────
+function renderLeadsChart() {
+  const el = document.getElementById('leadsChart');
+  if (!state.leads?.weekly?.length) { el.parentElement.innerHTML = '<p class="no-data">No organic lead data</p>'; return; }
+
+  const weekly = state.leads.weekly;
+  const labels = weekly.map(w => w.date.slice(5));
+
+  if (leadsChart) leadsChart.destroy();
+  leadsChart = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Active',     data: weekly.map(w => w.active   || 0), backgroundColor: '#22c55ecc', stack: 's' },
+        { label: 'Trialing',   data: weekly.map(w => w.trialing || 0), backgroundColor: '#f59e0bcc', stack: 's' },
+        { label: 'Not started',data: weekly.map(w => w.none     || 0), backgroundColor: '#475569cc', stack: 's' },
+        { label: 'Canceled',   data: weekly.map(w => w.canceled || 0), backgroundColor: '#ef444460', stack: 's' },
+      ],
+    },
+    options: {
+      ...CHART_OPTS,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+        footer: items => `Total: ${items.reduce((s, i) => s + i.parsed.y, 0)}`
+      }}},
+      scales: {
+        x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { stacked: true, ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+      },
+    },
+  });
+}
+
+// ── Queries table ─────────────────────────────────────────────────────────────
+function renderQueriesTable() {
+  const el = document.getElementById('queries-table');
+  if (!state.gsc?.queries?.length) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const rows = [...state.gsc.queries].sort((a, b) => b.clicks - a.clicks);
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Query</th>
+      <th class="td-num">Clicks</th>
+      <th class="td-num">Impressions</th>
+      <th class="td-num">CTR</th>
+      <th class="td-num">Position</th>
+    </tr></thead>
+    <tbody>${rows.map(r => {
+      const posClass = r.position <= 10 ? 'pos-top10' : r.position <= 20 ? 'pos-top20' : 'pos-below';
+      return `<tr>
+        <td>${escapeHtml(r.query)}</td>
+        <td class="td-num">${fmtN(r.clicks)}</td>
+        <td class="td-num">${fmtK(r.impressions)}</td>
+        <td class="td-num" style="color:var(--teal)">${fmtPct(r.ctr)}</td>
+        <td class="td-num"><span class="pos-badge ${posClass}">${fmtPos(r.position)}</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ── Pages table ───────────────────────────────────────────────────────────────
+function renderPagesTable() {
+  const el = document.getElementById('pages-table');
+  if (!state.gsc?.pages?.length) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const rows = [...state.gsc.pages].sort((a, b) => b.clicks - a.clicks);
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Page</th>
+      <th class="td-num">Clicks</th>
+      <th class="td-num">Impressions</th>
+      <th class="td-num">CTR</th>
+      <th class="td-num">Position</th>
+    </tr></thead>
+    <tbody>${rows.map(r => {
+      const posClass = r.position <= 10 ? 'pos-top10' : r.position <= 20 ? 'pos-top20' : 'pos-below';
+      const path = r.page.replace(/^https?:\/\/[^/]+/, '') || '/';
+      return `<tr>
+        <td><a href="${escapeHtml(r.page)}" target="_blank" class="td-url" title="${escapeHtml(r.page)}">${escapeHtml(path)}</a></td>
+        <td class="td-num">${fmtN(r.clicks)}</td>
+        <td class="td-num">${fmtK(r.impressions)}</td>
+        <td class="td-num" style="color:var(--teal)">${fmtPct(r.ctr)}</td>
+        <td class="td-num"><span class="pos-badge ${posClass}">${fmtPos(r.position)}</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auth (server-side, cookie-based) ──────────────────────────────────────────
+async function submitLogin(event) {
+  event.preventDefault();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try {
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (r.ok) {
+      document.getElementById('login-overlay').style.display = 'none';
+      startDashboard();
+    } else {
+      errEl.textContent = 'Wrong password. Try again.';
+      errEl.style.display = 'block';
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-password').focus();
+    }
+  } catch {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
+function startDashboard() {
+  dp = { unit: 'week', mode: 'last_n', n: 4 };
+  const { since, until } = calcRange('week', 'last_n', 4);
+  activeSince = since; activeUntil = until;
+  const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+  document.getElementById('dp-label').textContent = 'Last 4 weeks';
+  document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+  loadAll();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+(async function init() {
+  try {
+    const r = await fetch('/api/check-auth');
+    if (r.ok) {
+      startDashboard();
+    } else {
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.getElementById('login-password').focus();
+    }
+  } catch {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('login-password').focus();
+  }
+})();
+</script>
+</body>
+</html>
