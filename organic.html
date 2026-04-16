@@ -7,13 +7,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
+  :root, [data-theme="dark"] {
     --bg: #0b0f1a; --surface: #131929; --surface2: #1a2236; --border: #232d44;
     --text: #e2e8f0; --muted: #7a8ba8; --accent: #4f8ef7; --green: #22c55e;
     --red: #ef4444; --yellow: #f59e0b; --organic: #8b5cf6; --teal: #14b8a6;
     --clicks: #8b5cf6; --impr: #3b82f6; --ctr: #14b8a6; --pos: #f59e0b;
+    --overlay-bg: rgba(0,0,0,.6); --shadow: 0 8px 32px rgba(0,0,0,.5);
   }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; }
+  [data-theme="light"] {
+    --bg: #f5f7fa; --surface: #ffffff; --surface2: #edf0f4; --border: #d9dfe8;
+    --text: #1a202c; --muted: #64748b; --accent: #3b72d9; --green: #16a34a;
+    --red: #dc2626; --yellow: #d97706; --organic: #7c3aed; --teal: #0d9488;
+    --clicks: #7c3aed; --impr: #2563eb; --ctr: #0d9488; --pos: #d97706;
+    --overlay-bg: rgba(255,255,255,.8); --shadow: 0 8px 32px rgba(0,0,0,.1);
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; transition: background .2s, color .2s; }
 
   /* Header */
   header { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; background: var(--bg); }
@@ -123,6 +131,22 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .no-data { color: var(--muted); padding: 12px; font-size: 12px; }
 
+  /* Compare toggle */
+  .cmp-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .cmp-toggle { width: 34px; height: 18px; background: var(--border); border-radius: 99px; border: none; cursor: pointer; position: relative; transition: background .2s; padding: 0; }
+  .cmp-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--muted); border-radius: 50%; transition: all .2s; }
+  .cmp-toggle.on { background: var(--organic); }
+  .cmp-toggle.on::after { left: 18px; background: #fff; }
+  .cmp-select { padding: 3px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; cursor: pointer; }
+  .kpi-delta { font-size: 11px; font-weight: 600; margin-left: 4px; }
+  .kpi-delta.up { color: var(--green); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-delta.neutral { color: var(--muted); }
+
+  /* Theme toggle */
+  .theme-btn { padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px; display: flex; align-items: center; transition: background .15s; }
+  .theme-btn:hover { background: var(--surface2); }
+
   /* Login overlay */
   #login-overlay { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 9999; align-items: center; justify-content: center; }
 
@@ -176,9 +200,21 @@
       </div>
     </div>
     <div class="divider"></div>
+    <div class="cmp-wrap">
+      <button class="cmp-toggle" id="cmp-toggle" onclick="toggleCompare()" title="Compare periods"></button>
+      <span style="color:var(--muted)">Compare</span>
+      <select class="cmp-select" id="cmp-select" onchange="changeCompareMode(this.value)" style="display:none">
+        <option value="previous">Previous period</option>
+        <option value="yoy">Same period last year</option>
+      </select>
+    </div>
+    <div class="divider"></div>
     <button class="btn" onclick="loadAll()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       Refresh
+    </button>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">
+      <span id="theme-icon">&#9790;</span>
     </button>
     <span class="timestamp" id="ts">–</span>
   </div>
@@ -258,6 +294,8 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
 let state = { gsc: null, leads: null };
+let compareState = { gsc: null, leads: null };
+let compareEnabled = false, compareMode = 'previous';
 let trafficChart, ctrChart, posChart, leadsChart;
 let dp = { unit: 'week', mode: 'last_n', n: 4 };
 let activeSince = '', activeUntil = '';
@@ -269,13 +307,78 @@ const fmtN  = n => n == null ? '–' : parseInt(n).toLocaleString('en-US');
 const fmtPct= n => n == null ? '–' : (parseFloat(n)*100).toFixed(1)+'%';
 const fmtPos= n => n == null ? '–' : parseFloat(n).toFixed(1);
 
-const CHART_OPTS = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 11 } } } },
-};
+function chartOpts() {
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#7a8ba8';
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: muted, font: { size: 11 } } } },
+  };
+}
 
 function fmt_date(d) {
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return dd + '/' + mm;
+}
+
+function chartLabel(dateStr) {
+  const [, m, d] = dateStr.split('-');
+  return d + '/' + m;
+}
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('ol_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+}
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('ol_theme', next);
+  updateThemeIcon(next);
+  renderAll();
+}
+function updateThemeIcon(theme) {
+  document.getElementById('theme-icon').innerHTML = theme === 'dark' ? '&#9790;' : '&#9728;';
+}
+initTheme();
+
+// ── Compare ───────────────────────────────────────────────────────────────────
+function toggleCompare() {
+  compareEnabled = !compareEnabled;
+  document.getElementById('cmp-toggle').classList.toggle('on', compareEnabled);
+  document.getElementById('cmp-select').style.display = compareEnabled ? '' : 'none';
+  if (compareEnabled) loadAll(); else { compareState = { gsc: null, leads: null }; renderAll(); }
+}
+function changeCompareMode(mode) {
+  compareMode = mode;
+  if (compareEnabled) loadAll();
+}
+function getCompareRange(since, until) {
+  const s = new Date(since), u = new Date(until);
+  const days = Math.round((u - s) / 86400000);
+  if (compareMode === 'yoy') {
+    const cs = new Date(s); cs.setFullYear(cs.getFullYear() - 1);
+    const cu = new Date(u); cu.setFullYear(cu.getFullYear() - 1);
+    return { since: fmtISO(cs), until: fmtISO(cu) };
+  }
+  // previous period
+  const cu = new Date(s.getTime() - 86400000);
+  const cs = new Date(cu.getTime() - days * 86400000);
+  return { since: fmtISO(cs), until: fmtISO(cu) };
+}
+function fmtISO(d) {
+  const pad = s => String(s).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function deltaHtml(current, previous, reverse) {
+  if (current == null || previous == null || previous === 0) return '';
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  const isGood = reverse ? pct <= 0 : pct >= 0;
+  const cls = Math.abs(pct) < 1 ? 'neutral' : isGood ? 'up' : 'down';
+  const arrow = pct >= 0 ? '&#9650;' : '&#9660;';
+  return `<span class="kpi-delta ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
 }
 
 // ── Week aggregation for GSC daily data ──────────────────────────────────────
@@ -408,18 +511,39 @@ async function loadAll() {
   const dr = `since=${activeSince}&until=${activeUntil}`;
   document.getElementById('ts').textContent = '…';
 
-  const [gscRes, leadsRes] = await Promise.allSettled([
+  const fetches = [
     fetch(`/api/gsc?${dr}`).then(r => r.json()),
     fetch(`/api/organic-leads?${dr}`).then(r => r.json()),
-  ]);
+  ];
+
+  // Comparison fetches
+  if (compareEnabled) {
+    const cmp = getCompareRange(activeSince, activeUntil);
+    const cdr = `since=${cmp.since}&until=${cmp.until}`;
+    fetches.push(
+      fetch(`/api/gsc?${cdr}`).then(r => r.json()),
+      fetch(`/api/organic-leads?${cdr}`).then(r => r.json()),
+    );
+  }
+
+  const results = await Promise.allSettled(fetches);
 
   const errors = [];
+  const [gscRes, leadsRes] = results;
   state.gsc   = gscRes.status === 'fulfilled' && !gscRes.value.error   ? gscRes.value   : null;
   state.leads = leadsRes.status === 'fulfilled' && !leadsRes.value.error ? leadsRes.value : null;
   if (!state.gsc)   errors.push('GSC: ' + (gscRes.value?.error || gscRes.reason?.message || 'failed'));
   if (!state.leads) errors.push('Leads: ' + (leadsRes.value?.error || leadsRes.reason?.message || 'failed'));
-  if (errors.length) { banner.textContent = '⚠ ' + errors.join(' · '); banner.style.display = 'block'; }
 
+  if (compareEnabled && results.length >= 4) {
+    const [,, cGsc, cLeads] = results;
+    compareState.gsc   = cGsc.status === 'fulfilled' && !cGsc.value.error   ? cGsc.value   : null;
+    compareState.leads = cLeads.status === 'fulfilled' && !cLeads.value.error ? cLeads.value : null;
+  } else {
+    compareState = { gsc: null, leads: null };
+  }
+
+  if (errors.length) { banner.textContent = '⚠ ' + errors.join(' · '); banner.style.display = 'block'; }
   document.getElementById('ts').textContent = new Date().toLocaleTimeString();
   renderAll();
 }
@@ -439,35 +563,42 @@ function renderAll() {
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────────
-function renderKPIs() {
-  const el = document.getElementById('kpis');
-  const g = state.gsc;
-  const l = state.leads;
-
+function kpiMetrics(g, l) {
   const totalClicks  = g ? g.daily.reduce((s, r) => s + r.clicks, 0) : null;
   const totalImpr    = g ? g.daily.reduce((s, r) => s + r.impressions, 0) : null;
   const avgCTR       = totalClicks != null && totalImpr > 0 ? totalClicks / totalImpr : null;
   const avgPos       = g && totalImpr > 0
     ? g.daily.reduce((s, r) => s + r.position * r.impressions, 0) / totalImpr : null;
-
   const totalSignups = l ? Object.values(l.totals).reduce((s, v) => s + v, 0) : null;
   const totTrialing  = l ? (l.totals.trialing || 0) : null;
   const totActive    = l ? (l.totals.active || 0) : null;
   const totNone      = l ? (l.totals.none || 0) : null;
+  return { totalClicks, totalImpr, avgCTR, avgPos, totalSignups, totTrialing, totActive, totNone };
+}
+
+function renderKPIs() {
+  const el = document.getElementById('kpis');
+  const m = kpiMetrics(state.gsc, state.leads);
+  const c = compareEnabled ? kpiMetrics(compareState.gsc, compareState.leads) : null;
+
+  const cmpRange = compareEnabled ? getCompareRange(activeSince, activeUntil) : null;
+  const cmpLabel = compareEnabled
+    ? `vs ${fmt_date(new Date(cmpRange.since))} – ${fmt_date(new Date(cmpRange.until))}`
+    : '';
 
   el.innerHTML = [
-    { label: 'Organic Clicks',   value: fmtK(totalClicks),    sub: 'total in period',              cls: 'purple' },
-    { label: 'Impressions',      value: fmtK(totalImpr),      sub: 'total in period',              cls: '' },
-    { label: 'Avg CTR',          value: fmtPct(avgCTR),       sub: 'clicks ÷ impressions',         cls: avgCTR > 0.04 ? 'green' : avgCTR > 0.02 ? 'yellow' : 'red' },
-    { label: 'Avg Position',     value: fmtPos(avgPos),       sub: 'weighted by impressions',      cls: avgPos && avgPos < 10 ? 'green' : avgPos < 20 ? 'yellow' : '' },
-    { label: 'Organic Signups',  value: fmtN(totalSignups),   sub: 'no utm_source or gclid',       cls: 'teal-c' },
-    { label: 'Trialing',         value: fmtN(totTrialing),    sub: 'currently in free trial',      cls: 'yellow' },
-    { label: 'Active',           value: fmtN(totActive),      sub: 'converted to paid',            cls: 'green' },
-    { label: 'Not Started',      value: fmtN(totNone),        sub: 'stuck in signup flow',         cls: '' },
+    { label: 'Organic Clicks',   value: fmtK(m.totalClicks),    prev: c?.totalClicks,    raw: m.totalClicks,    sub: 'total in period',              cls: 'purple' },
+    { label: 'Impressions',      value: fmtK(m.totalImpr),      prev: c?.totalImpr,      raw: m.totalImpr,      sub: 'total in period',              cls: '' },
+    { label: 'Avg CTR',          value: fmtPct(m.avgCTR),       prev: c?.avgCTR,         raw: m.avgCTR,         sub: 'clicks / impressions',         cls: m.avgCTR > 0.04 ? 'green' : m.avgCTR > 0.02 ? 'yellow' : 'red' },
+    { label: 'Avg Position',     value: fmtPos(m.avgPos),       prev: c?.avgPos,         raw: m.avgPos,         sub: 'weighted by impressions',      cls: m.avgPos && m.avgPos < 10 ? 'green' : m.avgPos < 20 ? 'yellow' : '', reverse: true },
+    { label: 'Organic Signups',  value: fmtN(m.totalSignups),   prev: c?.totalSignups,   raw: m.totalSignups,   sub: 'no utm_source or gclid',       cls: 'teal-c' },
+    { label: 'Trialing',         value: fmtN(m.totTrialing),    prev: c?.totTrialing,    raw: m.totTrialing,    sub: 'currently in free trial',      cls: 'yellow' },
+    { label: 'Active',           value: fmtN(m.totActive),      prev: c?.totActive,      raw: m.totActive,      sub: 'converted to paid',            cls: 'green' },
+    { label: 'Not Started',      value: fmtN(m.totNone),        prev: c?.totNone,        raw: m.totNone,        sub: 'stuck in signup flow',         cls: '' },
   ].map(k => `<div class="kpi-card">
     <div class="kpi-label">${k.label}</div>
-    <div class="kpi-value ${k.cls}">${k.value}</div>
-    <div class="kpi-sub">${k.sub}</div>
+    <div class="kpi-value ${k.cls}">${k.value}${compareEnabled ? deltaHtml(k.raw, k.prev, k.reverse) : ''}</div>
+    <div class="kpi-sub">${compareEnabled && k.prev != null ? cmpLabel : k.sub}</div>
   </div>`).join('');
 }
 
@@ -477,41 +608,32 @@ function renderTrafficChart() {
   if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
 
   const weekly = aggregateGSCByWeek(state.gsc.daily);
-  const labels = weekly.map(w => w.date.slice(5));
+  const labels = weekly.map(w => chartLabel(w.date));
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+
+  const datasets = [
+    { label: 'Clicks', data: weekly.map(w => w.clicks), backgroundColor: '#8b5cf6cc', yAxisID: 'y', order: 2 },
+    { label: 'Impressions', data: weekly.map(w => w.impressions), type: 'line', borderColor: '#3b82f6', backgroundColor: 'transparent', pointRadius: 3, borderWidth: 2, tension: 0.3, yAxisID: 'y2', order: 1 },
+  ];
+  if (compareEnabled && compareState.gsc) {
+    const cw = aggregateGSCByWeek(compareState.gsc.daily);
+    datasets.push(
+      { label: 'Clicks (prev)', data: cw.map(w => w.clicks), backgroundColor: '#8b5cf640', yAxisID: 'y', order: 3 },
+      { label: 'Impressions (prev)', data: cw.map(w => w.impressions), type: 'line', borderColor: '#3b82f660', borderDash: [5,4], backgroundColor: 'transparent', pointRadius: 2, borderWidth: 1.5, tension: 0.3, yAxisID: 'y2', order: 0 },
+    );
+  }
 
   if (trafficChart) trafficChart.destroy();
   trafficChart = new Chart(el, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Clicks',
-          data: weekly.map(w => w.clicks),
-          backgroundColor: '#8b5cf6cc',
-          yAxisID: 'y',
-          order: 2,
-        },
-        {
-          label: 'Impressions',
-          data: weekly.map(w => w.impressions),
-          type: 'line',
-          borderColor: '#3b82f6',
-          backgroundColor: 'transparent',
-          pointRadius: 3,
-          borderWidth: 2,
-          tension: 0.3,
-          yAxisID: 'y2',
-          order: 1,
-        },
-      ],
-    },
+    data: { labels, datasets },
     options: {
-      ...CHART_OPTS,
+      ...chartOpts(),
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x:  { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
-        y:  { position: 'left',  ticks: { color: '#8b5cf6', font: { size: 10 } }, grid: { color: '#232d44' } },
+        x:  { ticks: { color: muted, maxRotation: 45, font: { size: 10 } }, grid: { color: border } },
+        y:  { position: 'left',  ticks: { color: '#8b5cf6', font: { size: 10 } }, grid: { color: border } },
         y2: { position: 'right', ticks: { color: '#3b82f6', font: { size: 10 } }, grid: { display: false } },
       },
     },
@@ -524,29 +646,25 @@ function renderCTRChart() {
   if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
 
   const weekly = aggregateGSCByWeek(state.gsc.daily);
-  const labels = weekly.map(w => w.date.slice(5));
+  const labels = weekly.map(w => chartLabel(w.date));
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+
+  const datasets = [{ label: 'CTR %', data: weekly.map(w => +(w.ctr * 100).toFixed(2)), borderColor: '#14b8a6', backgroundColor: '#14b8a620', fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2 }];
+  if (compareEnabled && compareState.gsc) {
+    const cw = aggregateGSCByWeek(compareState.gsc.daily);
+    datasets.push({ label: 'CTR % (prev)', data: cw.map(w => +(w.ctr * 100).toFixed(2)), borderColor: '#14b8a660', borderDash: [5,4], backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 1.5 });
+  }
 
   if (ctrChart) ctrChart.destroy();
   ctrChart = new Chart(el, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'CTR %',
-        data: weekly.map(w => +(w.ctr * 100).toFixed(2)),
-        borderColor: '#14b8a6',
-        backgroundColor: '#14b8a620',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        borderWidth: 2,
-      }],
-    },
+    data: { labels, datasets },
     options: {
-      ...CHART_OPTS,
+      ...chartOpts(),
       scales: {
-        x: { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
-        y: { ticks: { color: '#7a8ba8', callback: v => v+'%', font: { size: 10 } }, grid: { color: '#232d44' } },
+        x: { ticks: { color: muted, maxRotation: 45, font: { size: 10 } }, grid: { color: border } },
+        y: { ticks: { color: muted, callback: v => v+'%', font: { size: 10 } }, grid: { color: border } },
       },
     },
   });
@@ -558,34 +676,25 @@ function renderPositionChart() {
   if (!state.gsc) { el.parentElement.innerHTML = '<p class="no-data">No GSC data</p>'; return; }
 
   const weekly = aggregateGSCByWeek(state.gsc.daily);
-  const labels = weekly.map(w => w.date.slice(5));
+  const labels = weekly.map(w => chartLabel(w.date));
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+
+  const datasets = [{ label: 'Avg Position', data: weekly.map(w => +w.position.toFixed(1)), borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2 }];
+  if (compareEnabled && compareState.gsc) {
+    const cw = aggregateGSCByWeek(compareState.gsc.daily);
+    datasets.push({ label: 'Avg Position (prev)', data: cw.map(w => +w.position.toFixed(1)), borderColor: '#f59e0b60', borderDash: [5,4], backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, borderWidth: 1.5 });
+  }
 
   if (posChart) posChart.destroy();
   posChart = new Chart(el, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Avg Position',
-        data: weekly.map(w => +w.position.toFixed(1)),
-        borderColor: '#f59e0b',
-        backgroundColor: '#f59e0b20',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        borderWidth: 2,
-      }],
-    },
+    data: { labels, datasets },
     options: {
-      ...CHART_OPTS,
+      ...chartOpts(),
       scales: {
-        x: { ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
-        y: {
-          reverse: true,
-          ticks: { color: '#7a8ba8', font: { size: 10 } },
-          grid: { color: '#232d44' },
-          title: { display: true, text: 'lower = better', color: '#7a8ba8', font: { size: 10 } },
-        },
+        x: { ticks: { color: muted, maxRotation: 45, font: { size: 10 } }, grid: { color: border } },
+        y: { reverse: true, ticks: { color: muted, font: { size: 10 } }, grid: { color: border }, title: { display: true, text: 'lower = better', color: muted, font: { size: 10 } } },
       },
     },
   });
@@ -597,29 +706,36 @@ function renderLeadsChart() {
   if (!state.leads?.weekly?.length) { el.parentElement.innerHTML = '<p class="no-data">No organic lead data</p>'; return; }
 
   const weekly = state.leads.weekly;
-  const labels = weekly.map(w => w.date.slice(5));
+  const labels = weekly.map(w => chartLabel(w.date));
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+  const opts = chartOpts();
+
+  const datasets = [
+    { label: 'Active',     data: weekly.map(w => w.active   || 0), backgroundColor: '#22c55ecc', stack: 's' },
+    { label: 'Trialing',   data: weekly.map(w => w.trialing || 0), backgroundColor: '#f59e0bcc', stack: 's' },
+    { label: 'Not started',data: weekly.map(w => w.none     || 0), backgroundColor: '#475569cc', stack: 's' },
+    { label: 'Canceled',   data: weekly.map(w => w.canceled || 0), backgroundColor: '#ef444460', stack: 's' },
+  ];
+  if (compareEnabled && compareState.leads?.weekly?.length) {
+    const cw = compareState.leads.weekly;
+    const cTotal = cw.map(w => (w.active||0) + (w.trialing||0) + (w.none||0) + (w.canceled||0));
+    datasets.push({ label: 'Total (prev)', data: cTotal, type: 'line', borderColor: '#8b5cf660', borderDash: [5,4], backgroundColor: 'transparent', pointRadius: 2, borderWidth: 1.5, stack: false });
+  }
 
   if (leadsChart) leadsChart.destroy();
   leadsChart = new Chart(el, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Active',     data: weekly.map(w => w.active   || 0), backgroundColor: '#22c55ecc', stack: 's' },
-        { label: 'Trialing',   data: weekly.map(w => w.trialing || 0), backgroundColor: '#f59e0bcc', stack: 's' },
-        { label: 'Not started',data: weekly.map(w => w.none     || 0), backgroundColor: '#475569cc', stack: 's' },
-        { label: 'Canceled',   data: weekly.map(w => w.canceled || 0), backgroundColor: '#ef444460', stack: 's' },
-      ],
-    },
+    data: { labels, datasets },
     options: {
-      ...CHART_OPTS,
+      ...opts,
       interaction: { mode: 'index', intersect: false },
-      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+      plugins: { ...opts.plugins, tooltip: { callbacks: {
         footer: items => `Total: ${items.reduce((s, i) => s + i.parsed.y, 0)}`
       }}},
       scales: {
-        x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
-        y: { stacked: true, ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+        x: { stacked: true, ticks: { color: muted, maxRotation: 45, font: { size: 10 } }, grid: { color: border } },
+        y: { stacked: true, ticks: { color: muted, font: { size: 10 } }, grid: { color: border } },
       },
     },
   });
