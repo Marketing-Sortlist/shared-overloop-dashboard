@@ -1,3 +1,7 @@
 name = "overloop-dashboard"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "."
+
+[vars]
+YOUTUBE_API_KEY = "AIzaSyBUIyY-CwpYz6ZBG4cA6OFCbB7H0Z93Ooc"
+YOUTUBE_CHANNEL_ID = "UC_LgpxOvIoHwLENK_6bOHSg"
