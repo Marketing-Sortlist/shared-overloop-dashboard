@@ -595,6 +595,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelector(`.tab-bar button[onclick="switchTab('${name}')"]`).classList.add('active');
+  if (name === 'content') refreshContent();
 }
 
 // ── Main fetch ─────────────────────────────────────────────────────────────
