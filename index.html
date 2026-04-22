@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Overloop Growth Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://connect.facebook.net/en_US/sdk.js" async></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -14,8 +16,6 @@
     --organic: #8b5cf6; --direct: #94a3b8; --teal: #14b8a6;
   }
   body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; }
-
-  /* Header */
   header { padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; background: var(--bg); }
   .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
   .logo span { color: var(--accent); }
@@ -25,8 +25,6 @@
   .btn svg { width: 13px; height: 13px; }
   .timestamp { font-size: 11px; color: var(--muted); white-space: nowrap; }
   .divider { width: 1px; height: 20px; background: var(--border); }
-
-  /* Date picker */
   .dp-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
   .dp-btn:hover { background: var(--surface2); }
   .dp-btn .dp-label { color: var(--accent); font-weight: 600; }
@@ -49,26 +47,16 @@
   .dp-range-preview strong { color: var(--text); }
   .dp-apply { padding: 5px 16px; background: var(--teal); border: none; border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
   .dp-apply:hover { opacity: .85; }
-
-  /* Tab bar */
   .tab-bar { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; background: var(--bg); position: sticky; top: 49px; z-index: 99; }
   .tab-bar button { padding: 11px 18px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
   .tab-bar button.active { color: var(--teal); border-bottom-color: var(--teal); }
   .tab-bar button:hover:not(.active) { color: var(--text); }
-
-  /* Error */
   #error-banner { display: none; background: #3b1a1a; border: 1px solid #7f2020; color: #fca5a5; padding: 8px 24px; font-size: 12px; }
-
-  /* Tab panels */
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
   main { padding: 18px 24px; max-width: 1600px; margin: 0 auto; }
-
-  /* Tab goal */
   .tab-goal { font-size: 12px; color: var(--muted); margin-bottom: 14px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 0 8px 8px 0; }
   .tab-goal strong { color: var(--text); }
-
-  /* KPI strip */
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; margin-bottom: 16px; }
   .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
   .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
@@ -78,16 +66,12 @@
   .yellow { color: var(--yellow) !important; }
   .red { color: var(--red) !important; }
   .teal-c { color: var(--teal) !important; }
-
-  /* Charts */
   .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px; }
   .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .chart-card h3, .section-card h3 { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
   .chart-wrap { position: relative; height: 210px; }
   .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .chart-wrap-sm { position: relative; height: 190px; }
-
-  /* Tables */
   .tables-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; overflow-x: auto; }
   .table-card h3 { font-size: 12px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
@@ -100,8 +84,6 @@
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--surface2); }
   .attr-note { font-size: 11px; color: var(--muted); margin-bottom: 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-
-  /* Funnel */
   .funnel-step { margin-bottom: 16px; }
   .funnel-step:last-child { margin-bottom: 0; }
   .funnel-step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
@@ -116,8 +98,6 @@
   .seg-google { background: var(--google); }
   .seg-organic { background: var(--organic); }
   .seg-direct { background: var(--direct); }
-
-  /* Source breakdown */
   .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .source-col h4 { font-size: 12px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .src-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
@@ -130,43 +110,39 @@
   .mini-step-label strong { color: var(--text); font-weight: 500; }
   .mini-bar-bg { background: var(--surface2); border-radius: 3px; height: 5px; overflow: hidden; }
   .mini-bar { height: 100%; border-radius: 3px; transition: width .4s ease; }
-
-  /* Financials */
   .fin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .fin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
   .fin-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
   .fin-value { font-size: 26px; font-weight: 700; line-height: 1; }
   .fin-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-
-  /* Status badges */
   .status-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
   .status-active   { background: #16532420; color: var(--green); }
   .status-trialing { background: #78350f20; color: var(--yellow); }
   .status-canceled { background: #7f202020; color: var(--red); }
   .status-past_due { background: #7f202020; color: var(--red); }
-
-  /* Filter pills */
   .filter-pill { padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 500; white-space: nowrap; }
   .filter-pill:hover { color: var(--text); }
   .filter-pill.active { border-color: var(--teal); color: var(--teal); background: #14b8a618; }
   .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .filter-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; min-width: 48px; }
-
-  /* Loading */
   .loading { display: flex; align-items: center; justify-content: center; height: 70px; color: var(--muted); font-size: 12px; gap: 8px; }
   .spinner { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .no-data { color: var(--muted); padding: 12px; font-size: 12px; }
-
+  /* Content tab specifics */
+  .platform-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .platform-yt  { background: #ff444420; color: #ff4444; }
+  .platform-ig  { background: #e1306c20; color: #e1306c; }
+  .platform-li  { background: #0077b520; color: #0077b5; }
+  .placeholder-note { font-size: 11px; color: var(--muted); margin-top: 10px; padding: 6px 10px; background: #f59e0b10; border: 1px solid #f59e0b30; border-radius: 6px; display: inline-block; }
   @media (max-width: 900px) {
     .charts-row, .tables-row, .source-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
-
-<!-- Login overlay -->
-<div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center;">
+<!-- Login overlay (hidden for local preview) -->
+<div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:9999; align-items:center; justify-content:center;">
   <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px 36px; width:340px; box-shadow:0 16px 48px rgba(0,0,0,.6);">
     <div style="font-size:20px; font-weight:700; margin-bottom:4px;">Overloop <span style="color:var(--accent)">Dashboard</span></div>
     <div style="font-size:13px; color:var(--muted); margin-bottom:28px;">Enter the password to continue</div>
@@ -178,11 +154,9 @@
     </form>
   </div>
 </div>
-
 <header>
   <div class="logo">Overloop <span>Dashboard</span></div>
   <div class="header-right">
-    <!-- Date range picker -->
     <div class="dp-wrap" id="dp-wrap">
       <button class="dp-btn" onclick="togglePicker(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -210,39 +184,33 @@
     <span class="timestamp" id="ts">–</span>
   </div>
 </header>
-
 <nav class="tab-bar">
   <button class="active" onclick="switchTab('performance')">Performance</button>
   <button onclick="switchTab('funnel')">Onboarding</button>
   <button onclick="switchTab('financials')">Financials</button>
+  <button onclick="switchTab('content')">Content</button>
 </nav>
-
 <div id="error-banner"></div>
 
 <!-- ══════════════ PERFORMANCE ══════════════ -->
 <div id="tab-performance" class="tab-panel active">
 <main>
   <p class="tab-goal"><strong>Goal:</strong> Minimize cost per signup, trial, and activation — see how each paid channel performs and track the trend over time to catch regressions early.</p>
-
   <div class="kpi-grid" id="kpis">
     <div class="loading"><div class="spinner"></div> Loading…</div>
   </div>
-
   <div class="section-card">
     <h3>Cost per Outcome — Evolution (Combined paid)</h3>
     <div class="chart-wrap"><canvas id="costEvolutionChart"></canvas></div>
   </div>
-
   <div class="section-card" style="overflow-x:auto">
     <h3>Cost per Outcome — by Period &amp; Channel</h3>
     <div id="cost-by-period"><div class="loading"><div class="spinner"></div></div></div>
   </div>
-
   <div class="section-card" style="overflow-x:auto">
     <h3>Cost per Outcome — Full Period Summary</h3>
     <div id="cost-by-source"><div class="loading"><div class="spinner"></div></div></div>
   </div>
-
   <div class="charts-row">
     <div class="chart-card">
       <h3>Ad Spend — Meta + Google Ads</h3>
@@ -253,12 +221,10 @@
       <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
     </div>
   </div>
-
   <div class="section-card">
     <h3>Signups per Period — by Source</h3>
     <div class="chart-wrap-sm"><canvas id="signupsChart"></canvas></div>
   </div>
-
   <div class="tables-row">
     <div class="table-card">
       <h3><span class="badge badge-meta">META</span> Campaigns</h3>
@@ -269,7 +235,6 @@
       <div id="google-table"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
-
   <div class="attr-note">
     Attribution: Meta = 7d click + 1d view &nbsp;·&nbsp; Google Ads = last click &nbsp;·&nbsp; Signups/Funnel = Metabase (facebook utm → Meta; google utm or _gcl_aw → Google Ads; youtube/trustpilot/etc utm → shown by name; no utm → Organic)
   </div>
@@ -280,7 +245,6 @@
 <div id="tab-funnel" class="tab-panel">
 <main>
   <p class="tab-goal"><strong>Goal:</strong> Find leaking buckets — which steps lose the most users, and does the drop vary by acquisition channel or device? Fix the highest-drop steps first.</p>
-
   <div class="section-card">
     <h3>Funnel Overview — cumulative drop-off, unique by email</h3>
     <div id="funnel-filters" style="margin-bottom:14px">
@@ -289,26 +253,22 @@
     </div>
     <div id="funnel-steps"><div class="loading"><div class="spinner"></div></div></div>
   </div>
-
   <div class="section-card">
     <h3>Leaking Buckets by Channel — where does each source drop off?</h3>
     <div class="source-grid" id="source-grid">
       <div class="loading"><div class="spinner"></div></div>
     </div>
   </div>
-
   <div class="section-card">
     <h3>Leaking Buckets by Device — parsed from user agent</h3>
     <div id="device-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
       <div class="loading"><div class="spinner"></div></div>
     </div>
   </div>
-
   <div class="section-card" style="overflow-x:auto">
     <h3>Channel Breakdown Table</h3>
     <div id="source-table"><div class="loading"><div class="spinner"></div></div></div>
   </div>
-
   <div class="section-card">
     <h3>Trial Behaviour — 14-day window</h3>
     <div id="trial-behavior"><div class="loading"><div class="spinner"></div></div></div>
@@ -320,16 +280,13 @@
 <div id="tab-financials" class="tab-panel">
 <main>
   <p class="tab-goal"><strong>Goal:</strong> Track revenue health and retention — use MRR, ARPU, and LTV to set acquisition spend targets and evaluate channel ROI.</p>
-
   <div class="fin-grid" id="fin-kpis">
     <div class="loading"><div class="spinner"></div> Loading…</div>
   </div>
-
   <div class="section-card" style="overflow-x:auto">
     <h3>Paying Customers</h3>
     <div id="fin-paying"><div class="loading"><div class="spinner"></div></div></div>
   </div>
-
   <div class="section-card" style="overflow-x:auto">
     <h3>Churn — subscription_status ≠ active, newest first</h3>
     <div id="fin-churn"><div class="loading"><div class="spinner"></div></div></div>
@@ -337,14 +294,97 @@
 </main>
 </div>
 
+<!-- ══════════════ CONTENT ══════════════ -->
+<div id="tab-content" class="tab-panel">
+<main>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    <p class="tab-goal" style="margin-bottom:0;flex:1"><strong>Goal:</strong> Understand how content drives top-of-funnel awareness — track blog traffic, social media follower growth, and influencer post engagement to connect content effort to signup volume.</p>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span id="content-ts" style="font-size:11px;color:var(--muted)">Not yet loaded</span>
+      <button id="yt-connect-btn" class="btn" onclick="connectYouTube()" style="font-size:12px;padding:6px 14px;gap:6px;border-color:#ff4444;color:#ff4444">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+        Connect YouTube
+      </button>
+      <button id="ig-connect-btn" class="btn" onclick="connectInstagram()" style="font-size:12px;padding:6px 14px;gap:6px;border-color:#e1306c;color:#e1306c">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        Connect Instagram
+      </button>
+      <button id="li-connect-btn" class="btn" onclick="connectLinkedIn()" style="font-size:12px;padding:6px 14px;gap:6px;border-color:#0a66c2;color:#0a66c2">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        Connect LinkedIn
+      </button>
+      <button id="content-refresh-btn" class="btn" onclick="refreshContent()" style="background:var(--teal);border-color:var(--teal);color:#fff;font-size:12px;padding:6px 14px;gap:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Refresh Content
+      </button>
+    </div>
+  </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-grid" id="content-kpis">
+    <div class="loading"><div class="spinner"></div> Loading…</div>
+  </div>
+
+  <!-- Blog / SEO -->
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Blog / SEO — Top Posts</h3>
+    <div id="content-blog-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- Social media growth -->
+  <div class="section-card">
+    <h3>Social Media Growth — New Followers / Subscribers per Period</h3>
+    <div class="chart-wrap" style="height:220px"><canvas id="socialGrowthChart"></canvas></div>
+  </div>
+
+  <!-- Social breakdown table -->
+  <div class="section-card" style="overflow-x:auto">
+    <h3>New Followers &amp; Shorts Views — by Period</h3>
+    <div id="content-social-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- Influencer posts -->
+  <div class="section-card" style="overflow-x:auto">
+    <h3>LinkedIn Influencer Posts</h3>
+    <div id="content-influencer-table"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
+
 <script>
+// ══ CONFIG ════════════════════════════════════════════════════════════════
+// Only the Client ID goes here — never put the Client Secret in browser code
+const CONFIG = {
+  youtube: {
+    client_id:  'YOUR_YOUTUBE_CLIENT_ID.apps.googleusercontent.com',
+    channel_id: 'YOUR_CHANNEL_ID', // YouTube Studio → Settings → Channel → Advanced
+    scopes: 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly',
+  },
+  instagram: {
+    app_id:     'YOUR_FACEBOOK_APP_ID',     // developers.facebook.com → your app → App ID
+    // Requires: Instagram Business account linked to a Facebook Page
+    // Permissions needed: instagram_basic, instagram_manage_insights, pages_show_list
+  },
+  linkedin: {
+    client_id:    'YOUR_LINKEDIN_CLIENT_ID', // linkedin.com/developers → your app → Auth
+    redirect_uri: window.location.href.split('?')[0], // must match what's registered in your LinkedIn app
+    // Permissions needed: r_organization_social, rw_organization_admin
+    // Note: LinkedIn requires a backend for the code→token exchange.
+    // Until then, use Apify to pull LinkedIn follower stats.
+  },
+};
+// ══════════════════════════════════════════════════════════════════════════
+let ytAccessToken = null;
+let igAccessToken = null;
+let liAccessToken = null;
+
 // ── State ──────────────────────────────────────────────────────────────────
 let currentGranularity = 'week';
-let spendChart, donutChart, signupsChart, costEvolutionChart;
+let spendChart, donutChart, signupsChart, costEvolutionChart, socialGrowthChart;
+let platformCharts = {};
 let state = {};
-let funnelFilter = { type: null, value: null }; // type: 'source'|'device', value: key
-
-// Date picker state
+let funnelFilter = { type: null, value: null };
 let dp = { unit: 'week', mode: 'last_n', n: 6 };
 let activeSince = '', activeUntil = '';
 
@@ -353,26 +393,20 @@ function fmt$(n)  { if (!n) return '–'; return n >= 1000 ? '$'+(n/1000).toFixe
 function fmtN(n)  { return n != null ? parseInt(n).toLocaleString('en-US') : '–'; }
 function fmtPct(n){ return n != null ? parseFloat(n).toFixed(1)+'%' : '–'; }
 function fmtCur(n){ return n != null ? '$'+parseFloat(n).toFixed(2) : '–'; }
-
 const CHART_OPTS = {
   responsive: true, maintainAspectRatio: false,
   plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 11 } } } },
 };
-
-// ── Source helpers ──────────────────────────────────────────────────────────
 const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustpilot:'#00b67a', organic:'#8b5cf6' };
 const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
 function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
 function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
-// Get all source keys from period data, ordered: meta, google, known, organic last
 function getSources(data) {
   const all = new Set();
   for (const d of data) { for (const k of Object.keys(d)) { if (k !== 'date' && k !== 'count') all.add(k); } }
   const priority = { meta: 0, google: 1, organic: 99 };
   return [...all].sort((a, b) => (priority[a] ?? 50) - (priority[b] ?? 50) || a.localeCompare(b));
 }
-
-// Plugin: render total spend in the center of doughnut charts
 const donutCenterPlugin = {
   id: 'donutCenter',
   beforeDraw(chart) {
@@ -393,17 +427,15 @@ const donutCenterPlugin = {
     ctx.restore();
   }
 };
-
-// Aggregate daily data by week or month
 function aggregateByGranularity(dailyArr, gran) {
   if (gran === 'day') return dailyArr;
   const map = {};
   for (const d of dailyArr) {
     let key;
-    const dt = new Date(d.date + 'T12:00:00'); // noon avoids DST edge cases
+    const dt = new Date(d.date + 'T12:00:00');
     if (gran === 'week') {
-      const day  = dt.getDay(); // 0=Sun, 1=Mon…
-      const diff = day === 0 ? -6 : 1 - day; // offset to Monday
+      const day  = dt.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
       const mon  = new Date(dt);
       mon.setDate(dt.getDate() + diff);
       key = iso(mon);
@@ -421,28 +453,21 @@ function aggregateByGranularity(dailyArr, gran) {
 
 // ── Date picker ────────────────────────────────────────────────────────────
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function fmt_date(d) {
-  return MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate();
-}
+function fmt_date(d) { return MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate(); }
 function iso(d) {
-  // Use local date parts — avoids UTC timezone shift from toISOString()
   const y  = d.getFullYear();
   const m  = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 }
-
 function calcRange(unit, mode, n) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let since, until;
-
   if (unit === 'week') {
-    const dow    = today.getDay(); // 0=Sun
+    const dow    = today.getDay();
     const toMon  = dow === 0 ? -6 : 1 - dow;
     const thisMon = new Date(today); thisMon.setDate(today.getDate() + toMon);
     const thisSun = new Date(thisMon); thisSun.setDate(thisMon.getDate() + 6);
-
     if (mode === 'previous') {
       since = new Date(thisMon); since.setDate(thisMon.getDate() - 7);
       until = new Date(thisMon); until.setDate(thisMon.getDate() - 1);
@@ -452,7 +477,6 @@ function calcRange(unit, mode, n) {
       since = new Date(thisMon); since.setDate(thisMon.getDate() + 7);
       until = new Date(since);   until.setDate(since.getDate() + 6);
     } else if (mode === 'last_n') {
-      // last N weeks = (N-1) complete weeks before this week + current week → until = today
       since = new Date(thisMon); since.setDate(thisMon.getDate() - (n - 1) * 7);
       until = today;
     } else if (mode === 'next_n') {
@@ -463,36 +487,26 @@ function calcRange(unit, mode, n) {
     }
   } else if (unit === 'month') {
     const y = today.getFullYear(), m = today.getMonth();
-
     if (mode === 'previous') {
-      since = new Date(y, m - 1, 1);
-      until = new Date(y, m, 0);
+      since = new Date(y, m - 1, 1); until = new Date(y, m, 0);
     } else if (mode === 'this') {
-      since = new Date(y, m, 1);
-      until = new Date(y, m + 1, 0);
+      since = new Date(y, m, 1); until = new Date(y, m + 1, 0);
     } else if (mode === 'next') {
-      since = new Date(y, m + 1, 1);
-      until = new Date(y, m + 2, 0);
+      since = new Date(y, m + 1, 1); until = new Date(y, m + 2, 0);
     } else if (mode === 'last_n') {
-      // last N months = (N-1) complete months before this month + current month → until = today
-      since = new Date(y, m - (n - 1), 1);
-      until = today;
+      since = new Date(y, m - (n - 1), 1); until = today;
     } else if (mode === 'next_n') {
-      since = new Date(y, m + 1, 1);
-      until = new Date(y, m + 1 + n, 0);
+      since = new Date(y, m + 1, 1); until = new Date(y, m + 1 + n, 0);
     } else if (mode === 'to_date') {
       since = new Date(y, m, 1); until = today;
     }
-  } else { // day
+  } else {
     if (mode === 'previous') {
-      since = new Date(today); since.setDate(today.getDate() - 1);
-      until = new Date(since);
+      since = new Date(today); since.setDate(today.getDate() - 1); until = new Date(since);
     } else if (mode === 'this') {
       since = today; until = today;
     } else if (mode === 'last_n') {
-      // last N days = (N-1) days before today + today → until = today
-      since = new Date(today); since.setDate(today.getDate() - (n - 1));
-      until = today;
+      since = new Date(today); since.setDate(today.getDate() - (n - 1)); until = today;
     } else if (mode === 'next_n') {
       since = new Date(today); since.setDate(today.getDate() + 1);
       until = new Date(since); until.setDate(since.getDate() + n - 1);
@@ -500,10 +514,8 @@ function calcRange(unit, mode, n) {
       since = today; until = today;
     }
   }
-
   return { since: iso(since), until: iso(until) };
 }
-
 function dpLabel(unit, mode, n) {
   const u = unit === 'week' ? 'week' : unit === 'month' ? 'month' : 'day';
   if (mode === 'previous') return `Previous ${u}`;
@@ -514,29 +526,17 @@ function dpLabel(unit, mode, n) {
   if (mode === 'to_date')  return `${u.charAt(0).toUpperCase() + u.slice(1)} to date`;
   return '';
 }
-
 function updatePreview() {
   const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
   const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
-  const preview = fmt_date(s) + (since !== until ? ' – ' + fmt_date(u) : '');
-  document.getElementById('dp-preview').textContent = preview;
+  document.getElementById('dp-preview').textContent = fmt_date(s) + (since !== until ? ' – ' + fmt_date(u) : '');
 }
-
 function buildPickerOptions() {
   const u = dp.unit;
   const singular = u === 'week' ? 'week' : u === 'month' ? 'month' : 'day';
-
   const presets = u === 'day'
-    ? [
-        { mode: 'previous', label: 'Yesterday' },
-        { mode: 'this',     label: 'Today' },
-      ]
-    : [
-        { mode: 'previous', label: `Previous ${singular}` },
-        { mode: 'this',     label: `This ${singular}` },
-        { mode: 'next',     label: `Next ${singular}` },
-      ];
-
+    ? [{ mode: 'previous', label: 'Yesterday' }, { mode: 'this', label: 'Today' }]
+    : [{ mode: 'previous', label: `Previous ${singular}` }, { mode: 'this', label: `This ${singular}` }, { mode: 'next', label: `Next ${singular}` }];
   let leftHtml = '';
   for (const p of presets) {
     leftHtml += `<div class="dp-radio">
@@ -544,80 +544,56 @@ function buildPickerOptions() {
       <label for="dp_${p.mode}">${p.label}</label>
     </div>`;
   }
-
   const rightHtml = `
     <div class="dp-radio">
       <input type="radio" name="dpmode" id="dp_last_n" value="last_n" ${dp.mode === 'last_n' ? 'checked' : ''} onchange="dpPickMode('last_n')">
-      <label for="dp_last_n">
-        <span class="dp-n-row">
-          Last <input type="number" id="dp-n-last" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'last_n')"> ${singular}s
-        </span>
-      </label>
+      <label for="dp_last_n"><span class="dp-n-row">Last <input type="number" id="dp-n-last" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'last_n')"> ${singular}s</span></label>
     </div>
     <div class="dp-radio">
       <input type="radio" name="dpmode" id="dp_next_n" value="next_n" ${dp.mode === 'next_n' ? 'checked' : ''} onchange="dpPickMode('next_n')">
-      <label for="dp_next_n">
-        <span class="dp-n-row">
-          Next <input type="number" id="dp-n-next" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'next_n')"> ${singular}s
-        </span>
-      </label>
+      <label for="dp_next_n"><span class="dp-n-row">Next <input type="number" id="dp-n-next" min="1" max="52" value="${dp.n}" style="width:46px" oninput="dpSetN(this.value, 'next_n')"> ${singular}s</span></label>
     </div>
     <div class="dp-radio">
       <input type="radio" name="dpmode" id="dp_to_date" value="to_date" ${dp.mode === 'to_date' ? 'checked' : ''} onchange="dpPickMode('to_date')">
       <label for="dp_to_date">${singular.charAt(0).toUpperCase() + singular.slice(1)} to date</label>
     </div>`;
-
   document.getElementById('dp-options').innerHTML =
     `<div style="display:flex;flex-direction:column;gap:6px">${leftHtml}</div>` +
     `<div style="display:flex;flex-direction:column;gap:6px">${rightHtml}</div>`;
-
   updatePreview();
 }
-
 function togglePicker(e) {
   e.stopPropagation();
   const panel = document.getElementById('dp-panel');
   panel.classList.toggle('open');
   if (panel.classList.contains('open')) buildPickerOptions();
 }
-
 function dpSetUnit(unit) {
-  dp.unit = unit;
-  dp.mode = 'previous';
+  dp.unit = unit; dp.mode = 'previous';
   currentGranularity = unit === 'day' ? 'day' : unit === 'week' ? 'week' : 'month';
   document.querySelectorAll('[data-u]').forEach(b => b.classList.toggle('active', b.dataset.u === unit));
   buildPickerOptions();
 }
-
-function dpPickMode(mode) {
-  dp.mode = mode;
-  updatePreview();
-}
-
+function dpPickMode(mode) { dp.mode = mode; updatePreview(); }
 function dpSetN(val, mode) {
   dp.n = Math.max(1, parseInt(val) || 1);
   if (dp.mode !== mode) { dp.mode = mode; document.getElementById('dp_' + mode).checked = true; }
   updatePreview();
 }
-
 function applyPicker() {
   const { since, until } = calcRange(dp.unit, dp.mode, dp.n);
   activeSince = since; activeUntil = until;
   currentGranularity = dp.unit === 'day' ? 'day' : dp.unit === 'week' ? 'week' : 'month';
-
   const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
   document.getElementById('dp-label').textContent = dpLabel(dp.unit, dp.mode, dp.n);
   document.getElementById('dp-range-hdr').textContent = fmt_date(s) + (since !== until ? ' – ' + fmt_date(u) : '');
   document.getElementById('dp-panel').classList.remove('open');
   loadAll();
 }
-
-// Close picker on outside click
 document.addEventListener('click', e => {
   if (!document.getElementById('dp-wrap').contains(e.target))
     document.getElementById('dp-panel').classList.remove('open');
 });
-
 function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
@@ -629,26 +605,21 @@ function switchTab(name) {
 async function loadAll() {
   const errors = [];
   const base = window.location.origin;
-
   const dr = `since=${activeSince}&until=${activeUntil}`;
   const [mR, gR, mbR] = await Promise.allSettled([
     fetch(`${base}/api/meta?${dr}`).then(r => r.json()),
     fetch(`${base}/api/google?${dr}`).then(r => r.json()),
     fetch(`${base}/api/metabase?${dr}&granularity=${currentGranularity}`).then(r => r.json()),
   ]);
-
   const meta   = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
   const google = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
   const mb     = mbR.status === 'fulfilled' && !mbR.value?.error  ? mbR.value  : null;
-
   if (!meta)   errors.push('Meta: '   + (mR.value?.error   || mR.reason?.message   || 'failed'));
   if (!google) errors.push('Google Ads: ' + (gR.value?.error   || gR.reason?.message   || 'failed'));
   if (!mb)     errors.push('Metabase: '+ (mbR.value?.error || mbR.reason?.message  || 'failed'));
-
   const banner = document.getElementById('error-banner');
   banner.style.display = errors.length ? 'block' : 'none';
   if (errors.length) banner.textContent = '⚠ Partial data: ' + errors.join(' · ');
-
   state = { meta, google, mb };
   renderKPIs();
   renderCostEvolution();
@@ -663,51 +634,39 @@ async function loadAll() {
   renderSourceTable();
   renderTrialBehavior();
   renderFinancials();
+  // Content tab is NOT refreshed here — use the "Refresh Content" button to avoid Apify charges
   document.getElementById('ts').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ══ PERFORMANCE ══════════════════════════════════════════════════════════
-
-// Sum daily data — keeps KPIs and period table consistent
 function dailySpend(src) { return (src?.daily || []).reduce((s, d) => s + (d.spend || 0), 0) || src?.account?.spend || 0; }
-
 function renderKPIs() {
   const { meta, google, mb } = state;
   const mSpend = dailySpend(meta);
   const gSpend = dailySpend(google);
   const tot    = mSpend + gSpend;
-
   const fbs      = mb?.funnel_by_source || {};
   const sigs     = mb ? mb.signups_daily.reduce((s, d) => s + d.count, 0) : null;
-  // Paid signups = meta + google signups (users with a paid channel attribution)
   const metaSig  = fbs.meta?.[0]   || 0;
   const googleSig= fbs.google?.[0] || 0;
   const paidSigs = metaSig + googleSig;
-
-  // Paid trialing/active from funnel_by_source (step 8 = trialing index 7, step 9 = active index 8)
   const paidTrialing = (fbs.meta?.[7] || 0) + (fbs.google?.[7] || 0);
   const paidActive   = (fbs.meta?.[8] || 0) + (fbs.google?.[8] || 0);
-
-  // % of signups from paid channels
   const paidPct = sigs > 0 ? Math.round((paidSigs / sigs) * 100) : null;
-
-  // Cost metrics
   const cpSignup = paidSigs    > 0 ? tot / paidSigs    : null;
   const cpTrial  = paidTrialing > 0 ? tot / paidTrialing : null;
   const cpActive = paidActive   > 0 ? tot / paidActive   : null;
-
   const kpis = [
-    { l: 'Total Spend',      v: fmt$(tot),                                             s: 'Meta + Google' },
-    { l: 'Meta Spend',       v: fmt$(mSpend),                                          s: meta   ? fmtN(meta.account.impressions)+' impr'  : null, c: '' },
-    { l: 'Google Ads Spend', v: fmt$(gSpend),                                          s: google ? fmtN(google.account.clicks)+' clicks'   : null, c: '' },
-    { l: 'Signups',          v: sigs != null ? fmtN(sigs) : '–',                       s: 'all channels', c: 'green' },
-    { l: 'Paid Signups',     v: fmtN(paidSigs),                                        s: 'meta + google only', c: 'teal-c' },
-    { l: '% Paid Signups',   v: paidPct != null ? paidPct + '%' : '–',                 s: 'paid ÷ all signups', c: 'teal-c' },
-    { l: 'Cost / Signup',    v: cpSignup  ? fmtCur(cpSignup)  : '–',                   s: 'spend ÷ paid signups' },
-    { l: 'Cost / Trial',     v: cpTrial   ? fmtCur(cpTrial)   : '–',                   s: 'spend ÷ paid trialing', c: 'yellow' },
-    { l: 'Cost / Active',    v: cpActive  ? fmtCur(cpActive)  : '–',                   s: 'spend ÷ paid active', c: 'teal-c' },
+    { l: 'Total Spend',      v: fmt$(tot),                                  s: 'Meta + Google' },
+    { l: 'Meta Spend',       v: fmt$(mSpend),                               s: meta   ? fmtN(meta.account.impressions)+' impr'  : null },
+    { l: 'Google Ads Spend', v: fmt$(gSpend),                               s: google ? fmtN(google.account.clicks)+' clicks'   : null },
+    { l: 'Signups',          v: sigs != null ? fmtN(sigs) : '–',            s: 'all channels', c: 'green' },
+    { l: 'Paid Signups',     v: fmtN(paidSigs),                             s: 'meta + google only', c: 'teal-c' },
+    { l: '% Paid Signups',   v: paidPct != null ? paidPct + '%' : '–',      s: 'paid ÷ all signups', c: 'teal-c' },
+    { l: 'Cost / Signup',    v: cpSignup  ? fmtCur(cpSignup)  : '–',        s: 'spend ÷ paid signups' },
+    { l: 'Cost / Trial',     v: cpTrial   ? fmtCur(cpTrial)   : '–',        s: 'spend ÷ paid trialing', c: 'yellow' },
+    { l: 'Cost / Active',    v: cpActive  ? fmtCur(cpActive)  : '–',        s: 'spend ÷ paid active', c: 'teal-c' },
   ];
-
   document.getElementById('kpis').innerHTML = kpis.map(k =>
     `<div class="kpi-card">
       <div class="kpi-label">${k.l}</div>
@@ -716,12 +675,10 @@ function renderKPIs() {
     </div>`
   ).join('');
 }
-
 function renderCostEvolution() {
   const { meta, google, mb } = state;
   if (costEvolutionChart) { costEvolutionChart.destroy(); costEvolutionChart = null; }
   if (!mb) return;
-
   const mDaily    = aggregateByGranularity(meta?.daily   || [], currentGranularity);
   const gDaily    = aggregateByGranularity(google?.daily || [], currentGranularity);
   const mByD      = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
@@ -729,16 +686,12 @@ function renderCostEvolution() {
   const sigsByD   = Object.fromEntries((mb.signups_daily      || []).map(d => [d.date, d]));
   const trlsByD   = Object.fromEntries((mb.trials_daily       || []).map(d => [d.date, d]));
   const actsByD   = Object.fromEntries((mb.activations_daily  || []).map(d => [d.date, d]));
-  const hasTrl    = (mb.trials_daily      || []).length > 0;
-  const hasAct    = (mb.activations_daily || []).length > 0;
-
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
     ...mDaily.map(d => d.date), ...gDaily.map(d => d.date),
   ]);
   const dates = [...allDates].sort();
   if (dates.length < 2) return;
-
   const labels = dates.map(d => currentGranularity === 'month' ? d.slice(0,7) : d.slice(5));
   const cSig = [], cTrl = [], cAct = [];
   for (const date of dates) {
@@ -751,23 +704,17 @@ function renderCostEvolution() {
     cTrl.push(spend > 0 && trl > 0     ? Math.round(spend / trl     * 100)/100 : null);
     cAct.push(spend > 0 && act > 0     ? Math.round(spend / act     * 100)/100 : null);
   }
-
-  const datasets = [
-    { label: 'Cost/Signup',  data: cSig, borderColor: '#4f8ef7', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
-    { label: 'Cost/Trial',   data: cTrl, borderColor: '#f59e0b', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
-    { label: 'Cost/Active',  data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, hidden: true },
-  ];
-
   costEvolutionChart = new Chart(document.getElementById('costEvolutionChart'), {
     type: 'line',
-    data: { labels, datasets },
+    data: { labels, datasets: [
+      { label: 'Cost/Signup',  data: cSig, borderColor: '#4f8ef7', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
+      { label: 'Cost/Trial',   data: cTrl, borderColor: '#f59e0b', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
+      { label: 'Cost/Active',  data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, hidden: true },
+    ]},
     options: { ...CHART_OPTS,
       interaction: { mode: 'index', intersect: false },
       plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
-        label: (item) => {
-          const v = item.parsed.y;
-          return v != null ? ` ${item.dataset.label}: $${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
-        }
+        label: (item) => { const v = item.parsed.y; return v != null ? ` ${item.dataset.label}: $${v.toFixed(2)}` : ` ${item.dataset.label}: –`; }
       }}},
       scales: {
         x: { ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
@@ -776,84 +723,50 @@ function renderCostEvolution() {
     },
   });
 }
-
 function renderCostBySource() {
   const { meta, google, mb } = state;
   const el = document.getElementById('cost-by-source');
   if (!meta && !google) { el.innerHTML = '<p class="no-data">No ad data</p>'; return; }
-
-  const mSpend = dailySpend(meta);
-  const gSpend = dailySpend(google);
-  const tot    = mSpend + gSpend;
-
+  const mSpend = dailySpend(meta), gSpend = dailySpend(google), tot = mSpend + gSpend;
   const fbs = mb?.funnel_by_source || {};
-  // step indices (0-based): 0=all signups, 7=trialing (step8), 8=active (step9)
-  const metaSig    = fbs.meta?.[0]   || 0;
-  const googleSig  = fbs.google?.[0] || 0;
-  const metaTrial  = fbs.meta?.[7]   || 0;
-  const googleTrial= fbs.google?.[7] || 0;
-  const metaAct    = fbs.meta?.[8]   || 0;
-  const googleAct  = fbs.google?.[8] || 0;
-
   const rows = [
-    { src: 'Meta',        spend: mSpend, sig: metaSig,              trial: metaTrial,              active: metaAct },
-    { src: 'Google Ads',  spend: gSpend, sig: googleSig,            trial: googleTrial,            active: googleAct },
-    { src: 'Combined',    spend: tot,    sig: metaSig + googleSig,  trial: metaTrial + googleTrial, active: metaAct + googleAct },
+    { src: 'Meta',       spend: mSpend, sig: fbs.meta?.[0]||0,                         trial: fbs.meta?.[7]||0,                         active: fbs.meta?.[8]||0 },
+    { src: 'Google Ads', spend: gSpend, sig: fbs.google?.[0]||0,                       trial: fbs.google?.[7]||0,                       active: fbs.google?.[8]||0 },
+    { src: 'Combined',   spend: tot,    sig: (fbs.meta?.[0]||0)+(fbs.google?.[0]||0),  trial: (fbs.meta?.[7]||0)+(fbs.google?.[7]||0), active: (fbs.meta?.[8]||0)+(fbs.google?.[8]||0) },
   ];
-
-  el.innerHTML = `<table>
-    <thead><tr>
-      <th>Source</th><th>Spend</th>
-      <th>Paid Signups</th><th>Cost/Signup</th>
-      <th>Trialing</th><th>Cost/Trial</th>
-      <th>Active</th><th>Cost/Active</th>
-    </tr></thead>
+  el.innerHTML = `<table><thead><tr><th>Source</th><th>Spend</th><th>Paid Signups</th><th>Cost/Signup</th><th>Trialing</th><th>Cost/Trial</th><th>Active</th><th>Cost/Active</th></tr></thead>
     <tbody>${rows.map(r => `<tr>
-      <td style="font-weight:600">${r.src}</td>
-      <td>${fmt$(r.spend)}</td>
-      <td>${fmtN(r.sig)}</td>
-      <td>${r.sig > 0 ? fmtCur(r.spend / r.sig) : '–'}</td>
-      <td>${fmtN(r.trial)}</td>
-      <td>${r.trial > 0 ? fmtCur(r.spend / r.trial) : '–'}</td>
-      <td>${fmtN(r.active)}</td>
+      <td style="font-weight:600">${r.src}</td><td>${fmt$(r.spend)}</td><td>${fmtN(r.sig)}</td>
+      <td>${r.sig > 0 ? fmtCur(r.spend / r.sig) : '–'}</td><td>${fmtN(r.trial)}</td>
+      <td>${r.trial > 0 ? fmtCur(r.spend / r.trial) : '–'}</td><td>${fmtN(r.active)}</td>
       <td>${r.active > 0 ? fmtCur(r.spend / r.active) : '–'}</td>
-    </tr>`).join('')}</tbody>
-  </table>`;
+    </tr>`).join('')}</tbody></table>`;
 }
-
 function renderCostByPeriod() {
   const { meta, google, mb } = state;
   const el = document.getElementById('cost-by-period');
   if (!mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
   const mDaily    = aggregateByGranularity(meta?.daily   || [], currentGranularity);
   const gDaily    = aggregateByGranularity(google?.daily || [], currentGranularity);
   const mSpendByD = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
   const gSpendByD = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
-
   const sigsByD = Object.fromEntries((mb.signups_daily     || []).map(d => [d.date, d]));
   const trlsByD = Object.fromEntries((mb.trials_daily      || []).map(d => [d.date, d]));
   const actsByD = Object.fromEntries((mb.activations_daily || []).map(d => [d.date, d]));
-
   const hasTrl = (mb.trials_daily      || []).length > 0;
   const hasAct = (mb.activations_daily || []).length > 0;
-
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
     ...mDaily.map(d => d.date), ...gDaily.map(d => d.date),
   ]);
-  const dates = [...allDates].sort(); // ascending — columns left→right
+  const dates = [...allDates].sort();
   if (!dates.length) { el.innerHTML = '<p class="no-data">No data for selected period</p>'; return; }
-
   const fmtPeriod = d => currentGranularity === 'month' ? d.slice(0, 7) : d.slice(5);
   const dash = `<span style="color:var(--muted)">–</span>`;
-
-  // Pre-compute per-date data for each platform
   const byDate = {};
   for (const date of dates) {
     const mS = mSpendByD[date] || 0, gS = gSpendByD[date] || 0;
     const sigs = sigsByD[date] || {}, trls = trlsByD[date] || {}, acts = actsByD[date] || {};
-    // "Organic" = sum of all non-meta/google sources (youtube, trustpilot, organic, etc.)
     const organicKeys = Object.keys(sigs).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
     const organicSig  = organicKeys.reduce((s, k) => s + (sigs[k]||0), 0);
     const organicTrl  = organicKeys.reduce((s, k) => s + (trls[k]||0), 0);
@@ -865,38 +778,30 @@ function renderCostByPeriod() {
       organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct     },
     };
   }
-
-  // Sections: Combined, Meta, Google Ads, Organic
   const sections = [
-    { key: 'combined', label: 'Combined (paid)', color: 'var(--teal)',     hasPaid: true  },
-    { key: 'meta',     label: 'Meta',            color: 'var(--meta)',     hasPaid: true  },
-    { key: 'google',   label: 'Google Ads',      color: 'var(--google)',   hasPaid: true  },
-    { key: 'organic',  label: 'Organic',         color: 'var(--organic)',  hasPaid: false },
+    { key: 'combined', label: 'Combined (paid)', color: 'var(--teal)',   hasPaid: true  },
+    { key: 'meta',     label: 'Meta',            color: 'var(--meta)',   hasPaid: true  },
+    { key: 'google',   label: 'Google Ads',      color: 'var(--google)', hasPaid: true  },
+    { key: 'organic',  label: 'Organic',         color: 'var(--organic)',hasPaid: false },
   ];
-
-  // Rows per section
   const allMetrics = [
-    { key: 'spend', label: 'Spend',        paidOnly: true,  fmt: (r) => r.spend > 0 ? fmt$(r.spend) : dash },
-    { key: 'sig',   label: 'Signups',      paidOnly: false, fmt: (r) => fmtN(r.sig) },
-    { key: 'cps',   label: 'Cost/Signup',  paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.sig > 0 ? fmtCur(r.spend/r.sig) : dash },
+    { key: 'spend', label: 'Spend',       paidOnly: true,  fmt: (r) => r.spend > 0 ? fmt$(r.spend) : dash },
+    { key: 'sig',   label: 'Signups',     paidOnly: false, fmt: (r) => fmtN(r.sig) },
+    { key: 'cps',   label: 'Cost/Signup', paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.sig > 0 ? fmtCur(r.spend/r.sig) : dash },
     ...(hasTrl ? [
-      { key: 'trl', label: 'Trials',       paidOnly: false, fmt: (r) => fmtN(r.trl) },
-      { key: 'cpt', label: 'Cost/Trial',   paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.trl > 0 ? fmtCur(r.spend/r.trl) : dash },
+      { key: 'trl', label: 'Trials',      paidOnly: false, fmt: (r) => fmtN(r.trl) },
+      { key: 'cpt', label: 'Cost/Trial',  paidOnly: true,  hl: true, fmt: (r) => r.spend > 0 && r.trl > 0 ? fmtCur(r.spend/r.trl) : dash },
     ] : []),
     ...(hasAct ? [
-      { key: 'act', label: 'Activations',  paidOnly: false, fmt: (r) => fmtN(r.act) },
-      { key: 'cpa', label: 'Cost/Active',  paidOnly: true,  fmt: (r) => r.spend > 0 && r.act > 0 ? fmtCur(r.spend/r.act) : dash },
+      { key: 'act', label: 'Activations', paidOnly: false, fmt: (r) => fmtN(r.act) },
+      { key: 'cpa', label: 'Cost/Active', paidOnly: true,  fmt: (r) => r.spend > 0 && r.act > 0 ? fmtCur(r.spend/r.act) : dash },
     ] : []),
   ];
-
   const colSpan = 2 + dates.length;
-  let html = `<table style="font-size:12px">
-    <thead><tr>
-      <th style="min-width:100px">Platform</th>
-      <th style="min-width:80px">Metric</th>
-      ${dates.map(d => `<th style="text-align:right;min-width:68px">${fmtPeriod(d)}</th>`).join('')}
-    </tr></thead><tbody>`;
-
+  let html = `<table style="font-size:12px"><thead><tr>
+    <th style="min-width:100px">Platform</th><th style="min-width:80px">Metric</th>
+    ${dates.map(d => `<th style="text-align:right;min-width:68px">${fmtPeriod(d)}</th>`).join('')}
+  </tr></thead><tbody>`;
   for (const sec of sections) {
     const metrics = allMetrics.filter(m => !m.paidOnly || sec.hasPaid);
     html += `<tr style="background:var(--surface2)">
@@ -906,13 +811,10 @@ function renderCostByPeriod() {
       const dim  = !sec.hasPaid ? 'opacity:.6;' : '';
       const hl   = m.hl ? 'background:rgba(79,142,247,0.06);' : '';
       const lblSt = m.hl ? 'color:var(--text);font-weight:600;font-size:12px;' : 'color:var(--muted);font-size:11px;';
-      html += `<tr style="${dim}${hl}">
-        <td></td>
-        <td style="${lblSt}padding-left:12px">${m.label}</td>
+      html += `<tr style="${dim}${hl}"><td></td><td style="${lblSt}padding-left:12px">${m.label}</td>
         ${dates.map(d => {
           const v = m.fmt(byDate[d][sec.key]);
-          const valSt = m.hl ? 'font-weight:600;' : '';
-          return `<td style="text-align:right;${valSt}">${v}</td>`;
+          return `<td style="text-align:right;${m.hl?'font-weight:600;':''}">${v}</td>`;
         }).join('')}
       </tr>`;
     }
@@ -920,35 +822,26 @@ function renderCostByPeriod() {
   html += '</tbody></table>';
   el.innerHTML = html;
 }
-
 function renderSpendCharts() {
   const { meta, google } = state;
   const mDaily = aggregateByGranularity(meta?.daily   || [], currentGranularity);
   const gDaily = aggregateByGranularity(google?.daily || [], currentGranularity);
-
   const dateSet = new Set([...mDaily.map(d => d.date), ...gDaily.map(d => d.date)]);
   const dates   = [...dateSet].sort();
   const mByD    = Object.fromEntries(mDaily.map(d => [d.date, d.spend]));
   const gByD    = Object.fromEntries(gDaily.map(d => [d.date, d.spend]));
   const labels  = dates.map(d => currentGranularity === 'month' ? d.slice(0, 7) : d.slice(5));
-
   if (spendChart) spendChart.destroy();
   spendChart = new Chart(document.getElementById('spendChart'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Meta',       data: dates.map(d => mByD[d] || 0), backgroundColor: '#1877f2cc', stack: 's' },
-        { label: 'Google Ads', data: dates.map(d => gByD[d] || 0), backgroundColor: '#ea4335cc', stack: 's' },
-      ],
-    },
+    data: { labels, datasets: [
+      { label: 'Meta',       data: dates.map(d => mByD[d] || 0), backgroundColor: '#1877f2cc', stack: 's' },
+      { label: 'Google Ads', data: dates.map(d => gByD[d] || 0), backgroundColor: '#ea4335cc', stack: 's' },
+    ]},
     options: { ...CHART_OPTS,
       interaction: { mode: 'index', intersect: false },
       plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
-        footer: (items) => {
-          const total = items.reduce((s, i) => s + i.parsed.y, 0);
-          return `Total: $${total.toFixed(0)}`;
-        }
+        footer: (items) => `Total: $${items.reduce((s, i) => s + i.parsed.y, 0).toFixed(0)}`
       }}},
       scales: {
         x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
@@ -956,67 +849,43 @@ function renderSpendCharts() {
       }
     },
   });
-
   if (donutChart) donutChart.destroy();
-  const mS = dailySpend(meta), gS = dailySpend(google);
-  const donutTotal = mS + gS;
+  const mS = dailySpend(meta), gS = dailySpend(google), donutTotal = mS + gS;
   donutChart = new Chart(document.getElementById('donutChart'), {
     type: 'doughnut',
-    data: {
-      labels: ['Meta', 'Google Ads'],
-      datasets: [{ data: [mS, gS], backgroundColor: ['#1877f2', '#ea4335'], borderWidth: 0 }],
-    },
+    data: { labels: ['Meta', 'Google Ads'], datasets: [{ data: [mS, gS], backgroundColor: ['#1877f2', '#ea4335'], borderWidth: 0 }] },
     plugins: [donutCenterPlugin],
-    options: {
-      ...CHART_OPTS,
-      cutout: '68%',
+    options: { ...CHART_OPTS, cutout: '68%',
       plugins: {
-        tooltip: { callbacks: {
-          label: (item) => {
-            const pct = donutTotal > 0 ? Math.round((item.parsed / donutTotal) * 100) : 0;
-            return ` ${item.label}: ${fmt$(item.parsed)} (${pct}%)`;
+        tooltip: { callbacks: { label: (item) => { const pct = donutTotal > 0 ? Math.round((item.parsed / donutTotal) * 100) : 0; return ` ${item.label}: ${fmt$(item.parsed)} (${pct}%)`; }}},
+        legend: { position: 'bottom', labels: { color: '#7a8ba8', padding: 12, font: { size: 11 },
+          generateLabels: (chart) => {
+            const vals = chart.data.datasets[0].data;
+            const tot = vals.reduce((s, v) => s + (v || 0), 0);
+            return chart.data.labels.map((lbl, i) => ({
+              text: `${lbl}  ${tot > 0 ? Math.round((vals[i] / tot) * 100) : 0}%`,
+              fillStyle: chart.data.datasets[0].backgroundColor[i],
+              strokeStyle: chart.data.datasets[0].backgroundColor[i],
+              lineWidth: 0, index: i,
+            }));
           }
-        }},
-        legend: {
-          position: 'bottom',
-          labels: {
-            color: '#7a8ba8', padding: 12, font: { size: 11 },
-            generateLabels: (chart) => {
-              const vals = chart.data.datasets[0].data;
-              const tot = vals.reduce((s, v) => s + (v || 0), 0);
-              return chart.data.labels.map((lbl, i) => ({
-                text: `${lbl}  ${tot > 0 ? Math.round((vals[i] / tot) * 100) : 0}%`,
-                fillStyle: chart.data.datasets[0].backgroundColor[i],
-                strokeStyle: chart.data.datasets[0].backgroundColor[i],
-                lineWidth: 0, index: i,
-              }));
-            }
-          }
-        }
+        }}
       }
     },
   });
 }
-
 function renderSignupsChart() {
   const { mb } = state;
   const data = aggregateByGranularity(mb?.signups_daily || [], currentGranularity);
   const labels = data.map(d => currentGranularity === 'month' ? d.date.slice(0, 7) : d.date.slice(5));
-
   const srcs = getSources(data);
   if (signupsChart) signupsChart.destroy();
   signupsChart = new Chart(document.getElementById('signupsChart'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: srcs.map(s => ({ label: srcLabel(s), data: data.map(d => d[s]||0), backgroundColor: srcColor(s)+'cc', stack: 's' })),
-    },
+    data: { labels, datasets: srcs.map(s => ({ label: srcLabel(s), data: data.map(d => d[s]||0), backgroundColor: srcColor(s)+'cc', stack: 's' })) },
     options: { ...CHART_OPTS,
       plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
-        footer: (items) => {
-          const total = items.reduce((s, i) => s + i.parsed.y, 0);
-          return `Total: ${total}`;
-        }
+        footer: (items) => `Total: ${items.reduce((s, i) => s + i.parsed.y, 0)}`
       }}},
       scales: {
         x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
@@ -1025,17 +894,14 @@ function renderSignupsChart() {
     },
   });
 }
-
 function renderTables() {
   const { meta, google } = state;
-
   const mEl = document.getElementById('meta-table');
   mEl.innerHTML = !meta ? '<p class="no-data">No data</p>' :
     `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Leads</th><th>CPL</th><th>CTR</th></tr></thead>
     <tbody>${(meta.campaigns || []).map(c =>
       `<tr><td>${c.name}</td><td>${fmt$(c.spend)}</td><td>${fmtN(c.leads)}</td><td>${fmtCur(c.cpl)}</td><td>${fmtPct(c.ctr)}</td></tr>`
     ).join('')}</tbody></table>`;
-
   const gEl = document.getElementById('google-table');
   gEl.innerHTML = !google ? '<p class="no-data">No data</p>' :
     `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Conv.</th><th>CPA</th><th>Clicks</th></tr></thead>
@@ -1045,7 +911,6 @@ function renderTables() {
 }
 
 // ══ FUNNEL ════════════════════════════════════════════════════════════════
-
 function setFunnelFilter(type, value) {
   if (funnelFilter.type === type && funnelFilter.value === value) {
     funnelFilter = { type: null, value: null };
@@ -1055,13 +920,11 @@ function setFunnelFilter(type, value) {
   renderFunnelFilters();
   renderFunnelSteps();
 }
-
 function renderFunnelFilters() {
   const { mb } = state;
   if (!mb) return;
   const fbs = mb.funnel_by_source || {};
   const fbd = mb.funnel_by_device || {};
-
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
   document.getElementById('funnel-src-pills').innerHTML =
     ['all', ...srcKeys].map(s => {
@@ -1072,7 +935,6 @@ function renderFunnelFilters() {
       const n      = isAll ? '' : ` <span style="opacity:.6">${fmtN(fbs[s]?.[0]||0)}</span>`;
       return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}${n}</button>`;
     }).join('');
-
   const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
   document.getElementById('funnel-dev-pills').innerHTML = devKeys.length
     ? ['all', ...devKeys].map(d => {
@@ -1084,15 +946,11 @@ function renderFunnelFilters() {
       }).join('')
     : '<span style="font-size:11px;color:var(--muted)">loading…</span>';
 }
-
 function renderFunnelSteps() {
   const { mb } = state;
   const el = document.getElementById('funnel-steps');
   if (!mb?.funnel?.steps) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
   renderFunnelFilters();
-
-  // Pick steps array based on active filter
   let steps;
   if (funnelFilter.type === 'source') {
     steps = mb.funnel_by_source?.[funnelFilter.value] || mb.funnel.steps;
@@ -1101,53 +959,41 @@ function renderFunnelSteps() {
   } else {
     steps = mb.funnel.steps;
   }
-
   const total = steps[0] || 1;
-  // Only show source bar segments when no filter is active
   const fbs = funnelFilter.type === null ? (mb.funnel_by_source || {}) : {};
-
   const rows = [
-    { label: 'Step 1 — Signup',               val: steps[0], idx: 0 },
-    { label: 'Step 2 — Campaign Wizard',      val: steps[1], idx: 1 },
-    { label: 'Step 3 — Accounts',             val: steps[2], idx: 2 },
-    { label: 'Step 4 — Pitch Index',          val: steps[3], idx: 3 },
-    { label: 'Step 5 — Editor',               val: steps[4], idx: 4 },
-    { label: 'Step 6 — Prospects',            val: steps[5], idx: 5 },
-    { label: 'Step 7 — Congrats',             val: steps[6], idx: 6 },
-    { label: 'Step 8 — Trial',                val: steps[7], idx: 7 },
-    { label: 'Step 9 — Active',               val: steps[8], idx: 8 },
+    { label: 'Step 1 — Signup',          val: steps[0], idx: 0 },
+    { label: 'Step 2 — Campaign Wizard', val: steps[1], idx: 1 },
+    { label: 'Step 3 — Accounts',        val: steps[2], idx: 2 },
+    { label: 'Step 4 — Pitch Index',     val: steps[3], idx: 3 },
+    { label: 'Step 5 — Editor',          val: steps[4], idx: 4 },
+    { label: 'Step 6 — Prospects',       val: steps[5], idx: 5 },
+    { label: 'Step 7 — Congrats',        val: steps[6], idx: 6 },
+    { label: 'Step 8 — Trial',           val: steps[7], idx: 7 },
+    { label: 'Step 9 — Active',          val: steps[8], idx: 8 },
   ];
-
   el.innerHTML = rows.map((row, i) => {
     const val      = row.val || 0;
     const prevVal  = i === 0 ? total : (rows[i - 1].val || 1);
     const pctTotal = Math.round((val / total) * 100);
     const dropPct  = i > 0 ? Math.round(((prevVal - val) / prevVal) * 100) : null;
-
-    // Bar fill: solid color when filtered, multi-source segments when unfiltered
     let barInner;
     if (funnelFilter.type === null) {
-      // No filter — segmented by source
-      let mW = pctTotal, gW = 0, oW = 0; // fallback: solid accent
+      let mW = pctTotal, gW = 0, oW = 0;
       if (row.idx !== null) {
         const mV = fbs.meta?.[row.idx]   || 0;
         const gV = fbs.google?.[row.idx] || 0;
-        const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google')
-                    .reduce((s, k) => s + (fbs[k]?.[row.idx] || 0), 0);
+        const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google').reduce((s, k) => s + (fbs[k]?.[row.idx] || 0), 0);
         const srcTot = mV + gV + oV || 1;
-        mW = (mV / srcTot) * pctTotal;
-        gW = (gV / srcTot) * pctTotal;
-        oW = (oV / srcTot) * pctTotal;
+        mW = (mV / srcTot) * pctTotal; gW = (gV / srcTot) * pctTotal; oW = (oV / srcTot) * pctTotal;
       }
       barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
     } else {
-      // Filter active — single solid bar
       const color = funnelFilter.type === 'source'
         ? srcColor(funnelFilter.value)
         : { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' }[funnelFilter.value] || '#94a3b8';
       barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
     }
-
     return `<div class="funnel-step">
       <div class="funnel-step-header">
         <span class="funnel-step-name">${row.label}</span>
@@ -1157,138 +1003,83 @@ function renderFunnelSteps() {
           ${dropPct !== null ? `<span class="f-drop">↓ ${dropPct}% from prev</span>` : ''}
         </div>
       </div>
-      <div class="funnel-bar-bg">
-        <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
-      </div>
+      <div class="funnel-bar-bg"><div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div></div>
     </div>`;
   }).join('');
 }
-
 function renderSourceGrid() {
   const { mb } = state;
   const el = document.getElementById('source-grid');
   if (!mb?.funnel_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
   const fbs = mb.funnel_by_source;
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const stepLabels = [
-    'Signup', 'Campaign Wizard', 'Accounts', 'Pitch Index',
-    'Editor', 'Prospects', 'Congrats', 'Trial', 'Active',
-  ];
-  // Update grid columns dynamically
+  const stepLabels = ['Signup','Campaign Wizard','Accounts','Pitch Index','Editor','Prospects','Congrats','Trial','Active'];
   el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
-
   el.innerHTML = srcKeys.map(key => {
-    const vals  = fbs[key] || [];
-    const base  = vals[0] || 1;
-    const color = srcColor(key);
+    const vals = fbs[key] || [], base = vals[0] || 1, color = srcColor(key);
     return `<div class="source-col">
       <h4><span class="src-dot" style="background:${color}"></span>${srcLabel(key)} <span style="color:var(--muted);font-weight:400">${fmtN(vals[0] || 0)}</span></h4>
       ${stepLabels.map((label, i) => {
-        const v   = vals[i] || 0;
-        const pct = Math.round((v / base) * 100);
+        const v = vals[i] || 0, pct = Math.round((v / base) * 100);
         const drop = i > 0 ? Math.round(((vals[i-1]||0) - v) / (vals[i-1]||1) * 100) : null;
         const dropBadge = drop > 0 ? `<span style="color:var(--red);font-size:10px;margin-left:4px">↓${drop}%</span>` : '';
         return `<div class="mini-step">
-          <div class="mini-step-label">
-            <span>${label}${dropBadge}</span>
-            <strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span>
-          </div>
+          <div class="mini-step-label"><span>${label}${dropBadge}</span><strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span></div>
           <div class="mini-bar-bg"><div class="mini-bar" style="width:${pct}%;background:${color}"></div></div>
         </div>`;
       }).join('')}
     </div>`;
   }).join('');
 }
-
 function renderSourceTable() {
   const { mb } = state;
   const el = document.getElementById('source-table');
   if (!mb?.funnel_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
   const fbs = mb.funnel_by_source;
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const sources = srcKeys.map(k => ({ key: k, label: srcLabel(k) }));
-
-  const rows = sources.map(({ key, label }) => {
-    const v        = fbs[key] || [];
-    const signups  = v[0] || 0;
-    const wizard   = v[1] || 0;
-    const congrats = v[6] || 0;
-    const trialing = v[7] || 0;
-    const active   = v[8] || 0;
-    const rTrial  = signups > 0 ? ((trialing / signups) * 100).toFixed(1) + '%' : '–';
-    const rActive = signups > 0 ? ((active   / signups) * 100).toFixed(1) + '%' : '–';
-    return `<tr>
-      <td>${label}</td>
-      <td>${fmtN(signups)}</td>
-      <td>${fmtN(wizard)}</td>
-      <td>${fmtN(congrats)}</td>
-      <td>${fmtN(trialing)}</td>
-      <td>${fmtN(active)}</td>
-      <td>${rTrial}</td>
-      <td>${rActive}</td>
-    </tr>`;
+  const rows = srcKeys.map(key => {
+    const v = fbs[key] || [];
+    const signups = v[0]||0, wizard = v[1]||0, congrats = v[6]||0, trialing = v[7]||0, active = v[8]||0;
+    return `<tr><td>${srcLabel(key)}</td><td>${fmtN(signups)}</td><td>${fmtN(wizard)}</td><td>${fmtN(congrats)}</td><td>${fmtN(trialing)}</td><td>${fmtN(active)}</td>
+      <td>${signups > 0 ? ((trialing/signups)*100).toFixed(1)+'%' : '–'}</td>
+      <td>${signups > 0 ? ((active/signups)*100).toFixed(1)+'%' : '–'}</td></tr>`;
   });
-
-  el.innerHTML = `<table>
-    <thead><tr>
-      <th>Source</th><th>Signups</th><th>Wizard</th><th>Congrats</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Signup→Active</th>
-    </tr></thead>
-    <tbody>${rows.join('')}</tbody>
-  </table>`;
+  el.innerHTML = `<table><thead><tr><th>Source</th><th>Signups</th><th>Wizard</th><th>Congrats</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Signup→Active</th></tr></thead>
+    <tbody>${rows.join('')}</tbody></table>`;
 }
-
 function renderDeviceGrid() {
   const { mb } = state;
   const el = document.getElementById('device-grid');
   if (!el) return;
   const fbd = mb?.funnel_by_device;
-  if (!fbd || Object.keys(fbd).length === 0) {
-    el.innerHTML = '<p class="no-data">No device data</p>';
-    return;
-  }
-  if (fbd._error) {
-    el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`;
-    return;
-  }
-
+  if (!fbd || Object.keys(fbd).length === 0) { el.innerHTML = '<p class="no-data">No device data</p>'; return; }
+  if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
   const DEVICE_COLOR = { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' };
-  const stepLabels   = ['Signup','Campaign Wizard','Accounts','Pitch Index','Editor','Prospects','Congrats','Trial','Active'];
-
+  const stepLabels = ['Signup','Campaign Wizard','Accounts','Pitch Index','Editor','Prospects','Congrats','Trial','Active'];
   const devices = Object.entries(fbd).sort((a, b) => (b[1][0]||0) - (a[1][0]||0));
   el.innerHTML = devices.map(([device, vals]) => {
-    const color = DEVICE_COLOR[device] || '#94a3b8';
-    const base  = vals[0] || 1;
+    const color = DEVICE_COLOR[device] || '#94a3b8', base = vals[0] || 1;
     return `<div class="source-col">
       <h4><span class="src-dot" style="background:${color}"></span>${device} <span style="color:var(--muted);font-weight:400">${fmtN(vals[0]||0)}</span></h4>
       ${stepLabels.map((label, i) => {
-        const v   = vals[i] || 0;
-        const pct = Math.round((v / base) * 100);
-        const drop = i > 0 ? Math.round(((vals[i-1]||0) - v) / (vals[i-1]||1) * 100) : null;
+        const v = vals[i]||0, pct = Math.round((v/base)*100);
+        const drop = i > 0 ? Math.round(((vals[i-1]||0)-v)/(vals[i-1]||1)*100) : null;
         const dropBadge = drop !== null && drop > 0 ? `<span style="color:var(--red);font-size:10px;margin-left:4px">↓${drop}%</span>` : '';
         return `<div class="mini-step">
-          <div class="mini-step-label">
-            <span>${label}${dropBadge}</span>
-            <strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span>
-          </div>
+          <div class="mini-step-label"><span>${label}${dropBadge}</span><strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span></div>
           <div class="mini-bar-bg"><div class="mini-bar" style="width:${pct}%;background:${color}"></div></div>
         </div>`;
       }).join('')}
     </div>`;
   }).join('');
 }
-
 function renderTrialBehavior() {
   const { mb } = state;
   const el = document.getElementById('trial-behavior');
   if (!el) return;
   const tb = mb?.trial_behavior;
   if (!tb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
   const fmtDays = v => v != null ? parseFloat(v).toFixed(1) + ' days' : '–';
-
-  // Per-source avg signup→trial rows
   const srcMap = tb.avg_signup_to_trial_by_source || {};
   const srcOrder = ['meta', 'google', 'organic'];
   const otherSrcs = Object.keys(srcMap).filter(k => !srcOrder.includes(k));
@@ -1296,143 +1087,766 @@ function renderTrialBehavior() {
   const srcRows = allSrcs.map(k =>
     `<tr><td style="padding:4px 8px;color:var(--muted)">${srcLabel(k)}</td><td style="padding:4px 8px;font-weight:600">${fmtDays(srcMap[k])}</td></tr>`
   ).join('');
-
   el.innerHTML = `<div class="fin-grid" style="margin:0 0 16px">
-    <div class="fin-card">
-      <div class="fin-label">Avg: Signup → Trial</div>
-      <div class="fin-value">${fmtDays(tb.avg_days_signup_to_trial)}</div>
-      <div class="fin-sub">avg days from signup to trial_start</div>
-    </div>
-    <div class="fin-card">
-      <div class="fin-label">Avg: Trial → Active</div>
-      <div class="fin-value">${fmtDays(tb.avg_days_trial_to_active)}</div>
-      <div class="fin-sub">avg days from trial_start to subscribed_at (active only)</div>
-    </div>
-    <div class="fin-card">
-      <div class="fin-label">Past 14d — Not Active</div>
-      <div class="fin-value ${tb.over_14d_not_active > 0 ? 'red' : ''}">${fmtN(tb.over_14d_not_active)}</div>
-      <div class="fin-sub">&gt;14 days since trial_start, status ≠ active</div>
-    </div>
-    <div class="fin-card">
-      <div class="fin-label">In 14d Window</div>
-      <div class="fin-value yellow">${fmtN(tb.in_14d_window)}</div>
-      <div class="fin-sub">currently within 14 days since trial_start</div>
-    </div>
+    <div class="fin-card"><div class="fin-label">Avg: Signup → Trial</div><div class="fin-value">${fmtDays(tb.avg_days_signup_to_trial)}</div><div class="fin-sub">avg days from signup to trial_start</div></div>
+    <div class="fin-card"><div class="fin-label">Avg: Trial → Active</div><div class="fin-value">${fmtDays(tb.avg_days_trial_to_active)}</div><div class="fin-sub">avg days from trial_start to subscribed_at (active only)</div></div>
+    <div class="fin-card"><div class="fin-label">Past 14d — Not Active</div><div class="fin-value ${tb.over_14d_not_active > 0 ? 'red' : ''}">${fmtN(tb.over_14d_not_active)}</div><div class="fin-sub">&gt;14 days since trial_start, status ≠ active</div></div>
+    <div class="fin-card"><div class="fin-label">In 14d Window</div><div class="fin-value yellow">${fmtN(tb.in_14d_window)}</div><div class="fin-sub">currently within 14 days since trial_start</div></div>
   </div>
-  ${allSrcs.length ? `
-  <div style="margin-top:4px">
-    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Avg Signup → Trial by channel</div>
-    <table style="border-collapse:collapse;font-size:12px">${srcRows}</table>
-  </div>` : ''}`;
+  ${allSrcs.length ? `<div style="margin-top:4px"><div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Avg Signup → Trial by channel</div>
+    <table style="border-collapse:collapse;font-size:12px">${srcRows}</table></div>` : ''}`;
 }
 
 // ══ FINANCIALS ════════════════════════════════════════════════════════════
-
 function renderFinancials() {
   const { meta, google, mb } = state;
   const fin = mb?.financials || {};
   const el  = document.getElementById('fin-kpis');
-
   if (!mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
-
-  const mSpend = meta?.account?.spend || 0;
-  const gSpend = google?.account?.spend || 0;
+  const mSpend = meta?.account?.spend || 0, gSpend = google?.account?.spend || 0;
   const totalSpend = mSpend + gSpend;
-
-  const arpu = fin.arpu || 0;
-  const ltv  = fin.ltv;
+  const arpu = fin.arpu || 0, ltv = fin.ltv;
   const cac  = fin.active_paid > 0 ? totalSpend / fin.active_paid : null;
   const ltvCacRatio = cac && ltv ? (ltv / cac).toFixed(1) : null;
   const payback = arpu > 0 && cac ? (cac / arpu).toFixed(1) : null;
-
-  const tenureNote = fin.avg_tenure_months
-    ? `avg churned tenure ${fin.avg_tenure_months}mo`
-    : 'no churn data yet';
-
+  const tenureNote = fin.avg_tenure_months ? `avg churned tenure ${fin.avg_tenure_months}mo` : 'no churn data yet';
   const cards = [
-    { l: 'MRR',              v: fin.mrr ? '$'+fmtN(fin.mrr) : '–',
-      s: 'sum of active subscriptions (current)', c: 'teal-c' },
-    { l: 'Active Paid',      v: fmtN(fin.active_paid),
-      s: 'current self-service customers', c: 'green' },
-    { l: 'Trialing',         v: fmtN(fin.trialing),
-      s: 'currently in free trial', c: 'yellow' },
-    { l: 'Trial → Active',   v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–',
-      s: 'active ÷ (active+trialing) — current',
-      c: fin.trial_to_active_rate > 20 ? 'green' : 'yellow' },
-    { l: 'Churn Rate',       v: fin.churn_rate != null ? fin.churn_rate + '%' : '–',
-      s: 'churned ÷ (active+churned) — lifetime', c: fin.churn > 0 ? 'red' : '' },
-    { l: 'ARPU',             v: arpu ? fmtCur(arpu) : '–',
-      s: 'MRR ÷ active customers — monthly', c: '' },
-    { l: 'LTV (est.)',       v: ltv ? '$'+fmtN(ltv) : '–',
-      s: `ARPU × ${tenureNote}`, c: 'teal-c' },
-    { l: 'LTV : CAC',        v: ltvCacRatio ? ltvCacRatio + 'x' : '–',
-      s: 'LTV ÷ (period spend ÷ active) — target >3x',
-      c: ltvCacRatio > 3 ? 'green' : ltvCacRatio > 1 ? 'yellow' : 'red' },
-    { l: 'Payback Period',   v: payback ? payback + ' mo' : '–',
-      s: 'CAC ÷ ARPU — months to recover acquisition cost', c: '' },
-    { l: 'Churn Count',      v: fmtN(fin.churn || 0),
-      s: 'all-time status ≠ active', c: fin.churn > 0 ? 'red' : '' },
-    { l: 'Avg: Signup → Active', v: fin.avg_days_signup_to_active != null ? parseFloat(fin.avg_days_signup_to_active).toFixed(1) + ' days' : '–',
-      s: 'all-time avg days from signup to subscribed_at', c: '' },
+    { l: 'MRR',              v: fin.mrr ? '$'+fmtN(fin.mrr) : '–', s: 'sum of active subscriptions (current)', c: 'teal-c' },
+    { l: 'Active Paid',      v: fmtN(fin.active_paid), s: 'current self-service customers', c: 'green' },
+    { l: 'Trialing',         v: fmtN(fin.trialing), s: 'currently in free trial', c: 'yellow' },
+    { l: 'Trial → Active',   v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–', s: 'active ÷ (active+trialing) — current', c: fin.trial_to_active_rate > 20 ? 'green' : 'yellow' },
+    { l: 'Churn Rate',       v: fin.churn_rate != null ? fin.churn_rate + '%' : '–', s: 'churned ÷ (active+churned) — lifetime', c: fin.churn > 0 ? 'red' : '' },
+    { l: 'ARPU',             v: arpu ? fmtCur(arpu) : '–', s: 'MRR ÷ active customers — monthly' },
+    { l: 'LTV (est.)',       v: ltv ? '$'+fmtN(ltv) : '–', s: `ARPU × ${tenureNote}`, c: 'teal-c' },
+    { l: 'LTV : CAC',        v: ltvCacRatio ? ltvCacRatio + 'x' : '–', s: 'LTV ÷ (period spend ÷ active) — target >3x', c: ltvCacRatio > 3 ? 'green' : ltvCacRatio > 1 ? 'yellow' : 'red' },
+    { l: 'Payback Period',   v: payback ? payback + ' mo' : '–', s: 'CAC ÷ ARPU — months to recover acquisition cost' },
+    { l: 'Churn Count',      v: fmtN(fin.churn || 0), s: 'all-time status ≠ active', c: fin.churn > 0 ? 'red' : '' },
+    { l: 'Avg: Signup → Active', v: fin.avg_days_signup_to_active != null ? parseFloat(fin.avg_days_signup_to_active).toFixed(1) + ' days' : '–', s: 'all-time avg days from signup to subscribed_at' },
   ];
-
   el.innerHTML = cards.map(c =>
-    `<div class="fin-card">
-      <div class="fin-label">${c.l}</div>
-      <div class="fin-value ${c.c || ''}">${c.v}</div>
-      <div class="fin-sub">${c.s}</div>
-    </div>`
+    `<div class="fin-card"><div class="fin-label">${c.l}</div><div class="fin-value ${c.c || ''}">${c.v}</div><div class="fin-sub">${c.s}</div></div>`
   ).join('');
-
-  // Paying customers table
   const payEl = document.getElementById('fin-paying');
   const paying = fin.paying_customers || [];
-  if (!paying.length) {
-    payEl.innerHTML = '<p class="no-data">No active subscriptions found</p>';
-  } else {
-    payEl.innerHTML = `<table>
-      <thead><tr><th>Company</th><th>Email</th><th>Started</th><th>Plan</th><th>MRR</th><th>Seats</th><th>Source</th></tr></thead>
-      <tbody>${paying.map(c =>
-        `<tr>
-          <td>${c.company || '–'}</td>
-          <td style="color:var(--muted)">${c.email || '–'}</td>
-          <td>${c.started_at || '–'}</td>
-          <td>${c.plan || '–'}</td>
-          <td>$${(c.mrr||0).toFixed(0)}</td>
-          <td>${c.seats ?? '–'}</td>
-          <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
-        </tr>`
-      ).join('')}</tbody>
-    </table>`;
-  }
-
-  // Churn table
+  payEl.innerHTML = !paying.length ? '<p class="no-data">No active subscriptions found</p>' :
+    `<table><thead><tr><th>Company</th><th>Email</th><th>Started</th><th>Plan</th><th>MRR</th><th>Seats</th><th>Source</th></tr></thead>
+    <tbody>${paying.map(c => `<tr>
+      <td>${c.company||'–'}</td><td style="color:var(--muted)">${c.email||'–'}</td><td>${c.started_at||'–'}</td>
+      <td>${c.plan||'–'}</td><td>$${(c.mrr||0).toFixed(0)}</td><td>${c.seats??'–'}</td>
+      <td><span style="color:var(--muted)">${c.source||'–'}</span></td>
+    </tr>`).join('')}</tbody></table>`;
   const churnEl = document.getElementById('fin-churn');
   const churnList = fin.churn_list || [];
-  if (!churnList.length) {
-    churnEl.innerHTML = '<p class="no-data">No churned subscriptions found</p>';
+  churnEl.innerHTML = !churnList.length ? '<p class="no-data">No churned subscriptions found</p>' :
+    `<table><thead><tr><th>Company</th><th>Email</th><th>Sub Started</th><th>Status</th><th>Plan</th><th>MRR</th><th>Source</th></tr></thead>
+    <tbody>${churnList.map(c => `<tr>
+      <td>${c.company||'–'}</td><td style="color:var(--muted)">${c.email||'–'}</td><td>${c.started_at||'–'}</td>
+      <td><span class="status-badge status-${c.status}">${c.status}</span></td>
+      <td>${c.plan||'–'}</td><td>${c.mrr ? '$'+(c.mrr).toFixed(0) : '–'}</td>
+      <td><span style="color:var(--muted)">${c.source||'–'}</span></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+// ══ CONTENT ══════════════════════════════════════════════════════════════
+// Placeholder data — replace with real API when ready
+const CONTENT_MOCK = {
+  kpis: {
+    blog_clicks: 12840, blog_clicks_prev: 10200,
+    blog_impressions: 198400,
+    youtube_subs: 3240,         youtube_new: 142,
+    youtube_shorts_views: 84600, youtube_shorts_new: 21400,
+    instagram_followers: 7850,  instagram_new: 318,
+    linkedin_followers: 5120,   linkedin_new: 207,
+  },
+  blog_posts: [
+    { title: 'How to automate your sales outreach',      published: '2024-09-14', impressions: 42100, clicks: 3180, avg_position: 3.2,  ctr: 7.5 },
+    { title: 'Cold email best practices 2025',            published: '2024-11-03', impressions: 38600, clicks: 2890, avg_position: 5.1,  ctr: 7.5 },
+    { title: 'LinkedIn prospecting guide',                published: '2024-08-22', impressions: 29400, clicks: 1950, avg_position: 6.8,  ctr: 6.6 },
+    { title: 'B2B lead generation strategies',            published: '2024-10-30', impressions: 24100, clicks: 1720, avg_position: 8.4,  ctr: 7.1 },
+    { title: 'Email sequence templates that convert',     published: '2025-01-08', impressions: 18200, clicks: 1440, avg_position: 11.2, ctr: 7.9 },
+    { title: 'Sales automation tools comparison',         published: '2024-12-15', impressions: 14800, clicks: 980,  avg_position: 14.7, ctr: 6.6 },
+    { title: 'How to write a cold email subject line',   published: '2025-02-20', impressions: 12900, clicks: 1100, avg_position: 9.3,  ctr: 8.5 },
+    { title: 'CRM integration for sales teams',          published: '2024-07-18', impressions: 10200, clicks: 760,  avg_position: 18.5, ctr: 7.5 },
+  ],
+  // New followers / subscribers gained per period
+  social_growth: [
+    { label: 'Mar 17', youtube: 28, instagram: 61, linkedin: 38, shorts_views: 18200 },
+    { label: 'Mar 24', youtube: 34, instagram: 72, linkedin: 44, shorts_views: 22400 },
+    { label: 'Mar 31', youtube: 31, instagram: 68, linkedin: 51, shorts_views: 19800 },
+    { label: 'Apr 07', youtube: 49, instagram: 117, linkedin: 74, shorts_views: 24200 },
+  ],
+};
+
+// ── Influencer posts — editable in-memory (refresh resets to defaults) ──
+let influencerPosts = [
+  { author: 'Guillaume Moubeche', handle: '@g.moubeche',   post: "Just hit 10k customers using automated LinkedIn outreach — here's the exact sequence we used at Lemlist…",     likes: 2841, comments: 187, date: '2025-04-10' },
+  { author: 'Thibaut Souyris',    handle: '@tsouyris',     post: "Stop sending generic cold emails. Overloop's AI personalisation cut our reply time by 40% in one week.",       likes: 1432, comments: 94,  date: '2025-04-08' },
+  { author: 'Morgan J Ingram',    handle: '@morganjingram', post: "The best SDR tools I've tested in Q1 — full breakdown with real results from my team (thread)",                 likes: 987,  comments: 63,  date: '2025-04-05' },
+  { author: 'Florin Tatulea',     handle: '@florintatulea', post: "6-step prospecting framework that generated 38 SQLs last month. Overloop handles steps 3-5 automatically.",    likes: 763,  comments: 41,  date: '2025-04-02' },
+  { author: 'Becc Holland',       handle: '@beccholland',   post: "Personalisation at scale is no longer a nice-to-have. Here's how top-performing reps do it in 2025.",          likes: 654,  comments: 29,  date: '2025-03-28' },
+];
+let editingInfluencerIdx = null;
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderContent() {
+  renderContentKPIs();
+  renderBlogTable();
+  renderSocialGrowthChart();
+  renderSocialTable();
+  renderInfluencerTable();
+}
+
+function renderContentKPIs() {
+  const d = CONTENT_MOCK.kpis;
+  const delta = d.blog_clicks_prev > 0
+    ? Math.round(((d.blog_clicks - d.blog_clicks_prev) / d.blog_clicks_prev) * 100) : null;
+  const deltaStr = delta != null ? `${delta >= 0 ? '+' : ''}${delta}% vs prev period` : '';
+  const overallCTR = d.blog_impressions > 0 ? ((d.blog_clicks / d.blog_impressions) * 100).toFixed(1) : '–';
+  const kpis = [
+    { l: 'GSC Clicks',          v: fmtN(d.blog_clicks),           s: deltaStr,                                      c: delta >= 0 ? 'green' : 'red' },
+    { l: 'GSC Impressions',     v: fmtN(d.blog_impressions),       s: `overall CTR ${overallCTR}%`,                  c: '' },
+    { l: 'YouTube Subscribers', v: fmtN(d.youtube_subs),           s: `+${fmtN(d.youtube_new)} this period`,         c: '' },
+    { l: 'YT Shorts Views',     v: fmtN(d.youtube_shorts_views),   s: `+${fmtN(d.youtube_shorts_new)} this period`,  c: 'yellow' },
+    { l: 'Instagram Followers', v: fmtN(d.instagram_followers),    s: `+${fmtN(d.instagram_new)} this period`,       c: '' },
+    { l: 'LinkedIn Followers',  v: fmtN(d.linkedin_followers),     s: `+${fmtN(d.linkedin_new)} this period`,        c: 'teal-c' },
+  ];
+  document.getElementById('content-kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi-card">
+      <div class="kpi-label">${k.l}</div>
+      <div class="kpi-value ${k.c || ''}">${k.v}</div>
+      ${k.s ? `<div class="kpi-sub">${k.s}</div>` : ''}
+    </div>`
+  ).join('');
+}
+
+function renderBlogTable() {
+  const el = document.getElementById('content-blog-table');
+  const posts = CONTENT_MOCK.blog_posts;
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Post Title</th>
+      <th>Published</th>
+      <th style="text-align:right">Impressions</th>
+      <th style="text-align:right">Clicks</th>
+      <th style="text-align:right">CTR</th>
+      <th style="text-align:right">Avg. Position</th>
+    </tr></thead>
+    <tbody>${posts.map(p => {
+      const ctr = p.impressions > 0 ? ((p.clicks / p.impressions) * 100).toFixed(1) : p.ctr.toFixed(1);
+      const posColor = p.avg_position <= 5 ? 'var(--green)' : p.avg_position <= 10 ? 'var(--yellow)' : 'var(--red)';
+      return `<tr>
+        <td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(p.title)}">${escHtml(p.title)}</td>
+        <td style="color:var(--muted);white-space:nowrap">${p.published}</td>
+        <td style="text-align:right">${fmtN(p.impressions)}</td>
+        <td style="text-align:right;font-weight:600">${fmtN(p.clicks)}</td>
+        <td style="text-align:right">${ctr}%</td>
+        <td style="text-align:right;font-weight:600;color:${posColor}">${p.avg_position.toFixed(1)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>
+  <p class="placeholder-note">⚠ Placeholder data — connect to Google Search Console API to populate. Position colour: green ≤5 · yellow ≤10 · red >10.</p>`;
+}
+
+function renderSocialGrowthChart() {
+  if (socialGrowthChart) { socialGrowthChart.destroy(); socialGrowthChart = null; }
+  const data = CONTENT_MOCK.social_growth;
+  const labels = data.map(d => d.label);
+  socialGrowthChart = new Chart(document.getElementById('socialGrowthChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'YouTube Subs', data: data.map(d => d.youtube),   backgroundColor: '#ff444499', borderRadius: 3, stack: 'social' },
+      { label: 'Instagram',    data: data.map(d => d.instagram), backgroundColor: '#e1306c99', borderRadius: 3, stack: 'social' },
+      { label: 'LinkedIn',     data: data.map(d => d.linkedin),  backgroundColor: '#0077b599', borderRadius: 3, stack: 'social' },
+    ]},
+    options: { ...CHART_OPTS,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
+        footer: (items) => `Total new followers: ${items.reduce((s, i) => s + i.parsed.y, 0)}`
+      }}},
+      scales: {
+        x: { stacked: true, ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { stacked: true, ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
+      }
+    },
+  });
+}
+
+function renderSocialTable() {
+  const el = document.getElementById('content-social-table');
+  const data = CONTENT_MOCK.social_growth;
+  const totals = { youtube: 0, instagram: 0, linkedin: 0, shorts: 0 };
+  for (const d of data) {
+    totals.youtube += d.youtube; totals.instagram += d.instagram;
+    totals.linkedin += d.linkedin; totals.shorts += d.shorts_views || 0;
+  }
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Period</th>
+      <th style="text-align:right"><span class="platform-badge platform-yt">YT Subs</span></th>
+      <th style="text-align:right"><span class="platform-badge platform-yt">Shorts Views</span></th>
+      <th style="text-align:right"><span class="platform-badge platform-ig">Instagram</span></th>
+      <th style="text-align:right"><span class="platform-badge platform-li">LinkedIn</span></th>
+    </tr></thead>
+    <tbody>
+      ${data.map(d => `<tr>
+        <td>${d.label}</td>
+        <td style="text-align:right">${fmtN(d.youtube)}</td>
+        <td style="text-align:right;color:var(--yellow)">${fmtN(d.shorts_views || 0)}</td>
+        <td style="text-align:right">${fmtN(d.instagram)}</td>
+        <td style="text-align:right">${fmtN(d.linkedin)}</td>
+      </tr>`).join('')}
+      <tr style="background:var(--surface2);font-weight:700">
+        <td>Total</td>
+        <td style="text-align:right;color:#ff4444">${fmtN(totals.youtube)}</td>
+        <td style="text-align:right;color:var(--yellow)">${fmtN(totals.shorts)}</td>
+        <td style="text-align:right;color:#e1306c">${fmtN(totals.instagram)}</td>
+        <td style="text-align:right;color:#0077b5">${fmtN(totals.linkedin)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="placeholder-note">⚠ Placeholder data — numbers = new followers / subscribers gained per period. Connect to platform APIs to populate.</p>`;
+}
+
+function renderSocialPlatformCards() {
+  Object.values(platformCharts).forEach(c => c.destroy());
+  platformCharts = {};
+
+  const el = document.getElementById('social-platform-cards');
+  if (!el) return;
+  const data = CONTENT_MOCK.social_growth;
+  const d    = CONTENT_MOCK.kpis;
+  const labels = data.map(p => p.label);
+
+  // Trend: latest period vs previous period
+  const last = data[data.length - 1] || {};
+  const prev = data[data.length - 2] || {};
+  const trendPct = (curr, prv) => (!prv ? null : Math.round(((curr - prv) / prv) * 100));
+
+  const ICONS = {
+    yt: `<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>`,
+    ig: `<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`,
+    li: `<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+  };
+
+  const badge = (pct) => {
+    if (pct === null) return '';
+    const up = pct >= 0;
+    return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${up ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)'};color:${up ? '#22c55e' : '#ef4444'}">${up ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+  };
+
+  const divider = `<div style="height:1px;background:var(--border);margin:14px 0;opacity:.5"></div>`;
+
+  const platforms = [
+    {
+      id: 'yt', name: 'YouTube', color: '#ff4444',
+      gStart: 'rgba(255,68,68,.10)', gEnd: 'rgba(255,68,68,0)',
+      metrics: [
+        { label: 'Subscribers',  value: fmtN(d.youtube_subs),          sub: `+${fmtN(d.youtube_new)} this period`,         valueColor: '#e2e8f0', trend: trendPct(last.youtube, prev.youtube) },
+        { label: 'Shorts Views', value: fmtN(d.youtube_shorts_views),  sub: `+${fmtN(d.youtube_shorts_new)} this period`,  valueColor: '#f59e0b', trend: trendPct(last.shorts_views, prev.shorts_views) },
+      ],
+      series: [
+        { label: 'New Subs',     data: data.map(p => p.youtube),           color: '#ff4444' },
+        { label: 'Shorts Views', data: data.map(p => p.shorts_views || 0), color: '#f59e0b' },
+      ],
+    },
+    {
+      id: 'ig', name: 'Instagram', color: '#e1306c',
+      gStart: 'rgba(225,48,108,.10)', gEnd: 'rgba(225,48,108,0)',
+      metrics: [
+        { label: 'Followers', value: fmtN(d.instagram_followers), sub: `+${fmtN(d.instagram_new)} this period`, valueColor: '#e2e8f0', trend: trendPct(last.instagram, prev.instagram) },
+      ],
+      series: [{ label: 'New Followers', data: data.map(p => p.instagram), color: '#e1306c' }],
+    },
+    {
+      id: 'li', name: 'LinkedIn', color: '#0a66c2',
+      gStart: 'rgba(10,102,194,.10)', gEnd: 'rgba(10,102,194,0)',
+      metrics: [
+        { label: 'Followers', value: fmtN(d.linkedin_followers), sub: `+${fmtN(d.linkedin_new)} this period`, valueColor: '#e2e8f0', trend: trendPct(last.linkedin, prev.linkedin) },
+      ],
+      series: [{ label: 'New Followers', data: data.map(p => p.linkedin), color: '#0a66c2' }],
+    },
+  ];
+
+  el.innerHTML = platforms.map(p => `
+    <div style="background:linear-gradient(145deg,${p.gStart},var(--surface2) 60%);border:1px solid ${p.color}35;border-radius:16px;padding:20px;position:relative;overflow:hidden">
+      <!-- decorative glow blob -->
+      <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:${p.color};opacity:.06;pointer-events:none"></div>
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:${p.color}20;color:${p.color}">
+            ${ICONS[p.id]}
+          </div>
+          <span style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.3px">${p.name}</span>
+        </div>
+        ${badge(p.metrics[0]?.trend)}
+      </div>
+
+      <!-- Metrics -->
+      <div style="display:grid;grid-template-columns:repeat(${p.metrics.length},1fr);gap:16px;margin-bottom:4px">
+        ${p.metrics.map((m, mi) => `
+          <div style="${mi > 0 ? 'padding-left:16px;border-left:1px solid var(--border)' : ''}">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">${m.label}</div>
+            <div style="font-size:28px;font-weight:800;line-height:1;color:${m.valueColor};letter-spacing:-.8px">${m.value}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+              <span style="font-size:11px;color:var(--muted)">${m.sub}</span>
+              ${mi > 0 && m.trend !== null ? badge(m.trend) : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+
+      ${divider}
+
+      <!-- Sparkline charts -->
+      ${p.series.map((s, si) => `
+        <div style="${si > 0 ? 'margin-top:14px' : ''}">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${s.label} / period</div>
+          <div style="position:relative;height:72px"><canvas id="chart-${p.id}-${si}"></canvas></div>
+        </div>`).join('')}
+    </div>`).join('');
+
+  // Draw gradient area charts
+  requestAnimationFrame(() => {
+    platforms.forEach(p => {
+      p.series.forEach((s, si) => {
+        const canvas = document.getElementById(`chart-${p.id}-${si}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 72);
+        grad.addColorStop(0, s.color + '66');
+        grad.addColorStop(1, s.color + '00');
+        platformCharts[`${p.id}-${si}`] = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              data: s.data,
+              borderColor: s.color,
+              backgroundColor: grad,
+              fill: true,
+              tension: 0.45,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              pointBackgroundColor: s.color,
+              pointBorderColor: 'var(--surface)',
+              pointBorderWidth: 1.5,
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#1a2236',
+                borderColor: '#232d44',
+                borderWidth: 1,
+                callbacks: { label: (item) => ` ${s.label}: ${fmtN(item.parsed.y)}` },
+              },
+            },
+            scales: {
+              x: { ticks: { color: '#7a8ba8', font: { size: 9 } }, grid: { display: false }, border: { display: false } },
+              y: { ticks: { color: '#7a8ba8', font: { size: 9 }, maxTicksLimit: 3 }, grid: { color: '#232d4450' }, border: { display: false } },
+            },
+          },
+        });
+      });
+    });
+  });
+}
+
+// ── Influencer posts — editable ────────────────────────────────────────
+const INP_S = 'width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;outline:none;box-sizing:border-box';
+
+function renderInfluencerTable() {
+  const el = document.getElementById('content-influencer-table');
+  // Sort newest first
+  const sorted = influencerPosts.map((p, i) => ({ ...p, _idx: i })).sort((a, b) => b.date.localeCompare(a.date));
+  const rows = sorted.map(p => `<tr>
+    <td>
+      <div style="font-weight:600;font-size:12px;white-space:nowrap">${escHtml(p.author)}</div>
+      <div style="font-size:10px;color:var(--muted)">${escHtml(p.handle)}</div>
+    </td>
+    <td style="max-width:260px;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(p.post)}">${escHtml(p.post)}</td>
+    <td style="text-align:right;color:var(--green);font-weight:600">${fmtN(p.likes)}</td>
+    <td style="text-align:right">${fmtN(p.comments)}</td>
+    <td style="color:var(--muted);white-space:nowrap">${p.date}</td>
+    <td style="white-space:nowrap;text-align:right">
+      <button class="btn" onclick="openInfluencerForm(${p._idx})" style="padding:3px 8px;font-size:11px;margin-right:4px">Edit</button>
+      <button class="btn" onclick="deleteInfluencerPost(${p._idx})" style="padding:3px 8px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>
+    </td>
+  </tr>`).join('');
+
+  el.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Author</th>
+        <th>Post</th>
+        <th style="text-align:right">Likes</th>
+        <th style="text-align:right">Comments</th>
+        <th>Date</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:14px">
+      <button class="btn" onclick="openInfluencerForm(null)" style="background:var(--teal);border-color:var(--teal);color:#fff;font-size:12px;padding:6px 16px">+ Add Post</button>
+    </div>
+    <div id="influencer-form" style="display:none;margin-top:12px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:12px" id="inf-form-title">Add Influencer Post</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Author Name *</div>
+          <input id="inf-author" type="text" placeholder="e.g. Guillaume Moubeche" style="${INP_S}">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">LinkedIn Handle</div>
+          <input id="inf-handle" type="text" placeholder="e.g. @g.moubeche" style="${INP_S}">
+        </div>
+        <div style="grid-column:1/-1">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Post Text or URL *</div>
+          <textarea id="inf-post" rows="2" placeholder="Paste post excerpt or LinkedIn URL…" style="${INP_S};resize:vertical"></textarea>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Likes</div>
+          <input id="inf-likes" type="number" min="0" value="0" style="${INP_S}">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Comments</div>
+          <input id="inf-comments" type="number" min="0" value="0" style="${INP_S}">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Post Date *</div>
+          <input id="inf-date" type="date" style="${INP_S}">
+        </div>
+      </div>
+      <div id="inf-form-err" style="display:none;color:var(--red);font-size:11px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="saveInfluencerPost()" style="background:var(--teal);border-color:var(--teal);color:#fff">Save</button>
+        <button class="btn" onclick="closeInfluencerForm()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function openInfluencerForm(idx) {
+  editingInfluencerIdx = idx;
+  document.getElementById('inf-form-err').style.display = 'none';
+  document.getElementById('inf-form-title').textContent = idx === null ? 'Add Influencer Post' : 'Edit Influencer Post';
+  if (idx === null) {
+    document.getElementById('inf-author').value   = '';
+    document.getElementById('inf-handle').value   = '';
+    document.getElementById('inf-post').value     = '';
+    document.getElementById('inf-likes').value    = '0';
+    document.getElementById('inf-comments').value = '0';
+    document.getElementById('inf-date').value     = new Date().toISOString().slice(0, 10);
   } else {
-    churnEl.innerHTML = `<table>
-      <thead><tr><th>Company</th><th>Email</th><th>Sub Started</th><th>Status</th><th>Plan</th><th>MRR</th><th>Source</th></tr></thead>
-      <tbody>${churnList.map(c =>
-        `<tr>
-          <td>${c.company || '–'}</td>
-          <td style="color:var(--muted)">${c.email || '–'}</td>
-          <td>${c.started_at || '–'}</td>
-          <td><span class="status-badge status-${c.status}">${c.status}</span></td>
-          <td>${c.plan || '–'}</td>
-          <td>${c.mrr ? '$'+(c.mrr).toFixed(0) : '–'}</td>
-          <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
-        </tr>`
-      ).join('')}</tbody>
-    </table>`;
+    const p = influencerPosts[idx];
+    document.getElementById('inf-author').value   = p.author;
+    document.getElementById('inf-handle').value   = p.handle;
+    document.getElementById('inf-post').value     = p.post;
+    document.getElementById('inf-likes').value    = p.likes;
+    document.getElementById('inf-comments').value = p.comments;
+    document.getElementById('inf-date').value     = p.date;
+  }
+  const form = document.getElementById('influencer-form');
+  form.style.display = 'block';
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('inf-author').focus();
+}
+
+function closeInfluencerForm() {
+  document.getElementById('influencer-form').style.display = 'none';
+  editingInfluencerIdx = null;
+}
+
+function saveInfluencerPost() {
+  const author   = document.getElementById('inf-author').value.trim();
+  const handle   = document.getElementById('inf-handle').value.trim();
+  const post     = document.getElementById('inf-post').value.trim();
+  const likes    = parseInt(document.getElementById('inf-likes').value) || 0;
+  const comments = parseInt(document.getElementById('inf-comments').value) || 0;
+  const date     = document.getElementById('inf-date').value;
+  const errEl    = document.getElementById('inf-form-err');
+  if (!author || !post || !date) {
+    errEl.textContent = '⚠ Author, Post, and Date are required.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  const entry = { author, handle, post, likes, comments, date };
+  if (editingInfluencerIdx === null) {
+    influencerPosts.unshift(entry);
+  } else {
+    influencerPosts[editingInfluencerIdx] = entry;
+  }
+  closeInfluencerForm();
+  renderInfluencerTable();
+}
+
+function deleteInfluencerPost(idx) {
+  if (!confirm(`Delete post by "${influencerPosts[idx].author}"?`)) return;
+  influencerPosts.splice(idx, 1);
+  renderInfluencerTable();
+}
+
+// ── Instagram OAuth (via Facebook Login SDK) ──────────────────────────────
+window.fbAsyncInit = function() {
+  if (!CONFIG.instagram.app_id || CONFIG.instagram.app_id === 'YOUR_FACEBOOK_APP_ID') return;
+  FB.init({ appId: CONFIG.instagram.app_id, version: 'v19.0', xfbml: false, cookie: false });
+};
+
+function connectInstagram() {
+  if (!CONFIG.instagram.app_id || CONFIG.instagram.app_id === 'YOUR_FACEBOOK_APP_ID') {
+    alert('Paste your Facebook App ID into CONFIG.instagram.app_id at the top of the script.\n\nGet it at developers.facebook.com → your app → App ID.');
+    return;
+  }
+  FB.login(function(response) {
+    if (!response.authResponse) return;
+    igAccessToken = response.authResponse.accessToken;
+    const btn = document.getElementById('ig-connect-btn');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> Instagram ✓`;
+    btn.style.background = '#e1306c20';
+    refreshContent();
+  }, { scope: 'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement' });
+}
+
+async function fetchInstagramStats() {
+  if (!igAccessToken) return null;
+  try {
+    // 1. Get Facebook Pages the user manages
+    const pagesR = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${igAccessToken}`);
+    if (!pagesR.ok) throw new Error('Could not fetch pages');
+    const pagesJson = await pagesR.json();
+    const page = pagesJson.data?.[0];
+    if (!page) throw new Error('No Facebook Page found — link a Page to your Instagram Business account');
+
+    // 2. Get the Instagram Business Account linked to the page
+    const igR = await fetch(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`);
+    const igJson = await igR.json();
+    const igId = igJson.instagram_business_account?.id;
+    if (!igId) throw new Error('No Instagram Business Account linked to this Page');
+
+    // 3. Get follower count
+    const statR = await fetch(`https://graph.facebook.com/v19.0/${igId}?fields=followers_count,username&access_token=${page.access_token}`);
+    const statJson = await statR.json();
+
+    // 4. Get follower growth over the date range
+    const insightR = await fetch(
+      `https://graph.facebook.com/v19.0/${igId}/insights?metric=follower_count&period=day&since=${activeSince}&until=${activeUntil}&access_token=${page.access_token}`
+    );
+    let newFollowers = null;
+    if (insightR.ok) {
+      const insightJson = await insightR.json();
+      const values = insightJson.data?.[0]?.values || [];
+      const first = values[0]?.value || 0;
+      const last  = values[values.length - 1]?.value || 0;
+      newFollowers = last - first;
+    }
+
+    return {
+      followers:     parseInt(statJson.followers_count || 0),
+      new_followers: newFollowers,
+      username:      statJson.username,
+    };
+  } catch (e) {
+    console.warn('Instagram API error:', e.message);
+    igAccessToken = null;
+    return null;
   }
 }
 
-// Init default: previous week
+// ── LinkedIn OAuth ─────────────────────────────────────────────────────────
+// Note: LinkedIn requires a backend to exchange the auth code for a token
+// (client secret cannot be in browser code). Until you have a backend,
+// use Apify to pull LinkedIn follower stats instead.
+function connectLinkedIn() {
+  const { client_id, redirect_uri } = CONFIG.linkedin;
+  if (!client_id || client_id === 'YOUR_LINKEDIN_CLIENT_ID') {
+    alert('Paste your LinkedIn Client ID into CONFIG.linkedin.client_id.\n\nGet it at linkedin.com/developers → your app → Auth.\n\nNote: LinkedIn requires a backend to complete token exchange. For now, use Apify to pull follower data.');
+    return;
+  }
+  // Open OAuth consent in a popup — user authorises, LinkedIn redirects back
+  const state  = Math.random().toString(36).slice(2);
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id,
+    redirect_uri,
+    scope: 'r_organization_social rw_organization_admin r_basicprofile',
+    state,
+  });
+  const popup = window.open(
+    `https://www.linkedin.com/oauth/v2/authorization?${params}`,
+    'LinkedIn OAuth',
+    'width=600,height=700,scrollbars=yes'
+  );
+  // Listen for redirect back — requires a backend /api/linkedin-callback to exchange code
+  const poll = setInterval(() => {
+    try {
+      if (!popup || popup.closed) {
+        clearInterval(poll);
+        return;
+      }
+      const code = new URLSearchParams(popup.location.search).get('code');
+      if (code) {
+        popup.close();
+        clearInterval(poll);
+        // Exchange code server-side, then set liAccessToken
+        alert(`LinkedIn auth code received.\n\nSend this to your backend to exchange for a token:\n${code}\n\nOr use Apify to pull LinkedIn data without a backend.`);
+      }
+    } catch (_) { /* cross-origin — popup still on LinkedIn */ }
+  }, 500);
+}
+
+async function fetchLinkedInStats() {
+  if (!liAccessToken) return null;
+  try {
+    // Once you have a token from your backend, call:
+    // GET https://api.linkedin.com/v2/networkSizes/{org-id}?edgeType=CompanyFollowedByMember
+    return null; // placeholder until backend is wired
+  } catch (e) {
+    console.warn('LinkedIn API error:', e.message);
+    return null;
+  }
+}
+
+// ── Content refresh (manual only — avoids Apify charges) ─────────────────
+const REFRESH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
+const SPIN_ICON   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;animation:spin .7s linear infinite"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
+
+// ── YouTube OAuth connect ─────────────────────────────────────────────────
+function connectYouTube() {
+  const { client_id, scopes } = CONFIG.youtube;
+  if (!client_id || client_id.startsWith('YOUR_')) {
+    alert('Paste your YouTube Client ID into CONFIG.youtube.client_id at the top of the script.');
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id,
+    scope: scopes,
+    callback: (resp) => {
+      if (resp.error) { console.error('YouTube OAuth error:', resp.error); return; }
+      ytAccessToken = resp.access_token;
+      const btn = document.getElementById('yt-connect-btn');
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg> YouTube ✓`;
+      btn.style.background = '#ff444420';
+      btn.style.color = '#ff4444';
+      // Auto-refresh content once connected
+      refreshContent();
+    },
+  });
+  client.requestAccessToken();
+}
+
+async function fetchYouTubeStats() {
+  if (!ytAccessToken) return null;
+  const { channel_id } = CONFIG.youtube;
+  try {
+    // Channel stats (subscribers, views)
+    const statsUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true&key=none`;
+    const statsR = await fetch(statsUrl, { headers: { Authorization: `Bearer ${ytAccessToken}` } });
+    if (!statsR.ok) throw new Error(`Stats API ${statsR.status}`);
+    const statsJson = await statsR.json();
+    const stats = statsJson.items?.[0]?.statistics;
+    if (!stats) throw new Error('No channel stats returned');
+
+    // Analytics: new subscribers in the selected date range
+    const analyticsUrl = new URL('https://youtubeanalytics.googleapis.com/v2/reports');
+    analyticsUrl.searchParams.set('ids', 'channel==MINE');
+    analyticsUrl.searchParams.set('startDate', activeSince || '2025-01-01');
+    analyticsUrl.searchParams.set('endDate',   activeUntil || new Date().toISOString().slice(0,10));
+    analyticsUrl.searchParams.set('metrics',   'subscribersGained,subscribersLost,views');
+    analyticsUrl.searchParams.set('dimensions','day');
+    const analyticsR = await fetch(analyticsUrl.toString(), { headers: { Authorization: `Bearer ${ytAccessToken}` } });
+    let newSubs = null, periodViews = null;
+    if (analyticsR.ok) {
+      const analyticsJson = await analyticsR.json();
+      const rows = analyticsJson.rows || [];
+      newSubs     = rows.reduce((s, r) => s + (r[1] || 0) - (r[2] || 0), 0); // gained - lost
+      periodViews = rows.reduce((s, r) => s + (r[3] || 0), 0);
+    }
+
+    return {
+      subscribers:  parseInt(stats.subscriberCount || 0),
+      total_views:  parseInt(stats.viewCount        || 0),
+      new_subs:     newSubs,
+      period_views: periodViews,
+    };
+  } catch (e) {
+    console.warn('YouTube API error:', e.message);
+    ytAccessToken = null; // token likely expired
+    return null;
+  }
+}
+
+async function refreshContent() {
+  const btn = document.getElementById('content-refresh-btn');
+  const ts  = document.getElementById('content-ts');
+  btn.disabled = true;
+  btn.innerHTML = `${SPIN_ICON} Loading…`;
+  ts.textContent = 'Fetching…';
+
+  const errors = [];
+
+  // ── YouTube (OAuth) ───────────────────────────────────────────────────
+  const yt = await fetchYouTubeStats();
+  if (yt) {
+    CONTENT_MOCK.kpis.youtube_subs = yt.subscribers;
+    if (yt.new_subs     !== null) CONTENT_MOCK.kpis.youtube_new           = yt.new_subs;
+    if (yt.period_views !== null) CONTENT_MOCK.kpis.youtube_shorts_views  = yt.period_views;
+  } else if (ytAccessToken) {
+    errors.push('YouTube');
+  }
+
+  // ── Instagram (Facebook OAuth) ────────────────────────────────────────
+  const ig = await fetchInstagramStats();
+  if (ig) {
+    CONTENT_MOCK.kpis.instagram_followers = ig.followers;
+    if (ig.new_followers !== null) CONTENT_MOCK.kpis.instagram_new = ig.new_followers;
+  } else if (igAccessToken) {
+    errors.push('Instagram');
+  }
+
+  // ── LinkedIn (placeholder until backend ready) ─────────────────────────
+  // const li = await fetchLinkedInStats();
+  // if (li) {
+  //   CONTENT_MOCK.kpis.linkedin_followers = li.followers;
+  //   if (li.new_followers !== null) CONTENT_MOCK.kpis.linkedin_new = li.new_followers;
+  // } else if (liAccessToken) {
+  //   errors.push('LinkedIn');
+  // }
+
+  // ── Apify / other sources ────────────────────────────────────────────
+  // Uncomment and adapt once you have an /api/content endpoint from Apify:
+  // try {
+  //   const r = await fetch(`/api/content?since=${activeSince}&until=${activeUntil}`);
+  //   if (r.ok) {
+  //     const data = await r.json();
+  //     Object.assign(CONTENT_MOCK.kpis, data.kpis);
+  //     if (data.blog_posts)      CONTENT_MOCK.blog_posts      = data.blog_posts;
+  //     if (data.social_growth)   CONTENT_MOCK.social_growth   = data.social_growth;
+  //     if (data.influencer_posts) influencerPosts              = data.influencer_posts;
+  //   }
+  // } catch (e) { errors.push('Apify'); }
+
+  renderContent();
+
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  ts.textContent = errors.length
+    ? `${now} · ⚠ ${errors.join(', ')} failed`
+    : `Live · ${now}`;
+  ts.style.color = errors.length ? 'var(--yellow)' : 'var(--green)';
+
+  btn.disabled = false;
+  btn.innerHTML = `${REFRESH_ICON} Refresh Content`;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
 (function initDefault() {
   dp = { unit: 'week', mode: 'last_n', n: 4 };
-  // Auth check — show login overlay if not authenticated
   async function initDashboard() {
     try {
       const r = await fetch('/api/check-auth');
@@ -1447,7 +1861,6 @@ function renderFinancials() {
       document.getElementById('login-password').focus();
     }
   }
-
   function startDashboard() {
     document.getElementById('login-overlay').style.display = 'none';
     currentGranularity = 'week';
@@ -1459,7 +1872,6 @@ function renderFinancials() {
     loadAll();
     scheduleAutoRefresh();
   }
-
   initDashboard();
 })();
 
@@ -1470,23 +1882,18 @@ async function submitLogin(event) {
   errEl.style.display = 'none';
   try {
     const r = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
     if (r.ok) {
-      // Re-run dashboard init now that we're authenticated
       document.getElementById('login-overlay').style.display = 'none';
-      (() => {
-        currentGranularity = 'week';
-        const { since, until } = calcRange('week', 'last_n', 4);
-        activeSince = since; activeUntil = until;
-        const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
-        document.getElementById('dp-label').textContent = 'Last 4 weeks';
-        document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
-        loadAll();
-        scheduleAutoRefresh();
-      })();
+      currentGranularity = 'week';
+      const { since, until } = calcRange('week', 'last_n', 4);
+      activeSince = since; activeUntil = until;
+      const s = new Date(since + 'T00:00:00'), u = new Date(until + 'T00:00:00');
+      document.getElementById('dp-label').textContent = 'Last 4 weeks';
+      document.getElementById('dp-range-hdr').textContent = fmt_date(s) + ' – ' + fmt_date(u);
+      loadAll(); scheduleAutoRefresh();
     } else {
       errEl.textContent = 'Wrong password. Try again.';
       errEl.style.display = 'block';
@@ -1499,14 +1906,11 @@ async function submitLogin(event) {
   }
 }
 
-// Auto-refresh at 6:00 AM local time every day (tab must be open)
 function scheduleAutoRefresh() {
-  const now  = new Date();
-  const next = new Date();
+  const now = new Date(), next = new Date();
   next.setHours(6, 0, 0, 0);
   if (now >= next) next.setDate(next.getDate() + 1);
-  const ms = next - now;
-  setTimeout(() => { loadAll(); scheduleAutoRefresh(); }, ms);
+  setTimeout(() => { loadAll(); scheduleAutoRefresh(); }, next - now);
 }
 </script>
 </body>
