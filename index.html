@@ -301,10 +301,6 @@
     <p class="tab-goal" style="margin-bottom:0;flex:1"><strong>Goal:</strong> Understand how content drives top-of-funnel awareness — track blog traffic, social media follower growth, and influencer post engagement to connect content effort to signup volume.</p>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
       <span id="content-ts" style="font-size:11px;color:var(--muted)">Not yet loaded</span>
-      <button id="yt-connect-btn" class="btn" onclick="connectYouTube()" style="font-size:12px;padding:6px 14px;gap:6px;border-color:#ff4444;color:#ff4444">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-        Connect YouTube
-      </button>
       <button id="ig-connect-btn" class="btn" onclick="connectInstagram()" style="font-size:12px;padding:6px 14px;gap:6px;border-color:#e1306c;color:#e1306c">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
         Connect Instagram
@@ -1717,67 +1713,14 @@ async function fetchLinkedInStats() {
 const REFRESH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
 const SPIN_ICON   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;animation:spin .7s linear infinite"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
 
-// ── YouTube OAuth connect ─────────────────────────────────────────────────
-function connectYouTube() {
-  const { client_id, scopes } = CONFIG.youtube;
-  if (!client_id || client_id.startsWith('YOUR_')) {
-    alert('Paste your YouTube Client ID into CONFIG.youtube.client_id at the top of the script.');
-    return;
-  }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id,
-    scope: scopes,
-    callback: (resp) => {
-      if (resp.error) { console.error('YouTube OAuth error:', resp.error); return; }
-      ytAccessToken = resp.access_token;
-      const btn = document.getElementById('yt-connect-btn');
-      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg> YouTube ✓`;
-      btn.style.background = '#ff444420';
-      btn.style.color = '#ff4444';
-      // Auto-refresh content once connected
-      refreshContent();
-    },
-  });
-  client.requestAccessToken();
-}
-
+// ── YouTube (server-side) ─────────────────────────────────────────────────
 async function fetchYouTubeStats() {
-  if (!ytAccessToken) return null;
-  const { channel_id } = CONFIG.youtube;
   try {
-    // Channel stats (subscribers, views)
-    const statsUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true&key=none`;
-    const statsR = await fetch(statsUrl, { headers: { Authorization: `Bearer ${ytAccessToken}` } });
-    if (!statsR.ok) throw new Error(`Stats API ${statsR.status}`);
-    const statsJson = await statsR.json();
-    const stats = statsJson.items?.[0]?.statistics;
-    if (!stats) throw new Error('No channel stats returned');
-
-    // Analytics: new subscribers in the selected date range
-    const analyticsUrl = new URL('https://youtubeanalytics.googleapis.com/v2/reports');
-    analyticsUrl.searchParams.set('ids', 'channel==MINE');
-    analyticsUrl.searchParams.set('startDate', activeSince || '2025-01-01');
-    analyticsUrl.searchParams.set('endDate',   activeUntil || new Date().toISOString().slice(0,10));
-    analyticsUrl.searchParams.set('metrics',   'subscribersGained,subscribersLost,views');
-    analyticsUrl.searchParams.set('dimensions','day');
-    const analyticsR = await fetch(analyticsUrl.toString(), { headers: { Authorization: `Bearer ${ytAccessToken}` } });
-    let newSubs = null, periodViews = null;
-    if (analyticsR.ok) {
-      const analyticsJson = await analyticsR.json();
-      const rows = analyticsJson.rows || [];
-      newSubs     = rows.reduce((s, r) => s + (r[1] || 0) - (r[2] || 0), 0); // gained - lost
-      periodViews = rows.reduce((s, r) => s + (r[3] || 0), 0);
-    }
-
-    return {
-      subscribers:  parseInt(stats.subscriberCount || 0),
-      total_views:  parseInt(stats.viewCount        || 0),
-      new_subs:     newSubs,
-      period_views: periodViews,
-    };
+    const r = await fetch(`/api/youtube`);
+    if (!r.ok) return null;
+    return await r.json();
   } catch (e) {
     console.warn('YouTube API error:', e.message);
-    ytAccessToken = null; // token likely expired
     return null;
   }
 }
@@ -1791,13 +1734,12 @@ async function refreshContent() {
 
   const errors = [];
 
-  // ── YouTube (OAuth) ───────────────────────────────────────────────────
+  // ── YouTube (server-side) ─────────────────────────────────────────────
   const yt = await fetchYouTubeStats();
-  if (yt) {
-    CONTENT_MOCK.kpis.youtube_subs = yt.subscribers;
-    if (yt.new_subs     !== null) CONTENT_MOCK.kpis.youtube_new           = yt.new_subs;
-    if (yt.period_views !== null) CONTENT_MOCK.kpis.youtube_shorts_views  = yt.period_views;
-  } else if (ytAccessToken) {
+  if (yt && !yt.error) {
+    CONTENT_MOCK.kpis.youtube_subs         = yt.subscribers;
+    CONTENT_MOCK.kpis.youtube_shorts_views = yt.total_views;
+  } else {
     errors.push('YouTube');
   }
 
