@@ -1395,10 +1395,18 @@ function renderFunnelCompare() {
   };
 
   const rows = [
-    { label: 'Signups',  v1: c.v1_signups,  v2: c.v2_signups,  note: 'Companies created in period (no v2 session vs has v2 session)' },
-    { label: 'Trialing', v1: c.v1_trialing, v2: c.v2_trialing, note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
-    { label: 'Active',   v1: c.v1_active,   v2: c.v2_active,   note: 'Both: sub.status = active' },
+    { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
+    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
+    { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
+    { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'sub.status = canceled + subscribed_at IS NULL (never paid)' },
+    { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'sub.status = canceled + subscribed_at IS NOT NULL (was paying)' },
   ];
+
+  const rowColor = (label, side) => {
+    if (label.startsWith('Canceled')) return 'var(--red)';
+    if (label === 'Active') return 'var(--green)';
+    return side === 'v1' ? 'var(--accent)' : 'var(--teal)';
+  };
 
   const tableRows = rows.map(r => `
     <tr style="border-bottom:1px solid var(--border)">
@@ -1406,12 +1414,12 @@ function renderFunnelCompare() {
       <td style="padding:12px 14px;text-align:center">
         <div style="font-size:16px;font-weight:700">${fmtN(r.v1)}</div>
         <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v1, c.v1_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v1, c.v1_signups, 'var(--accent)') : ''}
+        ${r.label !== 'Signups' ? bar(r.v1, c.v1_signups, rowColor(r.label, 'v1')) : ''}
       </td>
       <td style="padding:12px 14px;text-align:center">
         <div style="font-size:16px;font-weight:700">${fmtN(r.v2)}</div>
         <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v2, c.v2_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v2, c.v2_signups, 'var(--teal)') : ''}
+        ${r.label !== 'Signups' ? bar(r.v2, c.v2_signups, rowColor(r.label, 'v2')) : ''}
       </td>
       <td style="padding:12px 14px;font-size:11px;color:var(--muted)">${r.note}</td>
     </tr>`).join('');

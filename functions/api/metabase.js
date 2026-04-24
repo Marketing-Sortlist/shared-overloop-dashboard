@@ -535,12 +535,16 @@ export async function onRequest(context) {
     try {
       const cmpRows = await runSQL(env, `
         SELECT
-          COUNT(*) FILTER (WHERE s.user_id IS NULL)                                AS v1_signups,
-          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL)                            AS v2_signups,
-          COUNT(*) FILTER (WHERE sub.status = 'trialing' AND s.user_id IS NULL)   AS v1_trialing,
-          COUNT(*) FILTER (WHERE s.state = 'completed')                            AS v2_trialing,
-          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)     AS v1_active,
-          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL) AS v2_active
+          COUNT(*) FILTER (WHERE s.user_id IS NULL)                                                          AS v1_signups,
+          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL)                                                      AS v2_signups,
+          COUNT(*) FILTER (WHERE sub.status = 'trialing' AND s.user_id IS NULL)                             AS v1_trialing,
+          COUNT(*) FILTER (WHERE s.state = 'completed')                                                      AS v2_trialing,
+          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)                               AS v1_active,
+          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL)                           AS v2_active,
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL AND s.user_id IS NULL)     AS v1_canceled_trial,
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL AND s.user_id IS NULL) AS v1_canceled_active,
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL AND s.user_id IS NOT NULL)     AS v2_canceled_trial,
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL AND s.user_id IS NOT NULL) AS v2_canceled_active
         FROM companies
         JOIN LATERAL (
           SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
@@ -555,11 +559,13 @@ export async function onRequest(context) {
         ${INTERNAL_FILTER}
       `);
       if (cmpRows[0]) {
-        const [v1s, v2s, v1t, v2t, v1a, v2a] = cmpRows[0];
+        const [v1s, v2s, v1t, v2t, v1a, v2a, v1ct, v1ca, v2ct, v2ca] = cmpRows[0];
         compare = {
           v1_signups: Number(v1s), v2_signups: Number(v2s),
           v1_trialing: Number(v1t), v2_trialing: Number(v2t),
           v1_active: Number(v1a), v2_active: Number(v2a),
+          v1_canceled_trial: Number(v1ct), v1_canceled_active: Number(v1ca),
+          v2_canceled_trial: Number(v2ct), v2_canceled_active: Number(v2ca),
         };
       }
     } catch (e) { compare = null; }
