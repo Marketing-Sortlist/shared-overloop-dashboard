@@ -393,7 +393,63 @@ export async function onRequest(context) {
       if (saRows[0]?.[0] != null) avg_days_signup_to_active = Number(saRows[0][0]);
     } catch (_) {}
 
-    // 8. Financial metrics
+    // 8. V2 funnel
+    const V2_STEP = `
+      CASE
+        WHEN s.state = 'email_confirmed'           THEN 1
+        WHEN s.state = 'domain_provided'           THEN 2
+        WHEN s.state = 'business_details_accepted' THEN 3
+        WHEN s.state = 'icp_accepted'              THEN 4
+        WHEN s.state = 'channels_accepted'         THEN 5
+        WHEN s.state = 'sequence_accepted'         THEN 6
+        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN s.state = 'completed'                 THEN 8
+        ELSE 0
+      END
+    `;
+    let funnel_v2 = { steps: Array(8).fill(0), total: 0 };
+    let funnel_v2_by_source = {};
+    try {
+      const fv2Rows = await runSQL(env, `
+        WITH raw AS (
+          SELECT
+            u.email,
+            ${SOURCE_CASE} AS source,
+            MAX(${V2_STEP}) AS step_num
+          FROM companies
+          JOIN LATERAL (
+            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          JOIN onboarding_v2_sessions s ON s.user_id = u.id
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          ${INTERNAL_FILTER}
+          GROUP BY u.email, source
+        )
+        SELECT
+          source,
+          COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
+          COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
+          COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
+          COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
+          COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
+          COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
+          COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
+          COUNT(*) FILTER (WHERE step_num >= 8) AS s8
+        FROM raw
+        GROUP BY source
+      `);
+      const v2Totals = Array(8).fill(0);
+      for (const [source, ...counts] of fv2Rows) {
+        if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(8).fill(0);
+        counts.forEach((v, i) => {
+          funnel_v2_by_source[source][i] += Number(v);
+          v2Totals[i] += Number(v);
+        });
+      }
+      funnel_v2 = { steps: v2Totals, total: v2Totals[0] || 0 };
+    } catch (e) { funnel_v2 = { steps: Array(8).fill(0), total: 0, _error: e.message }; }
+
+    // 9. Financial metrics
     const churn_count = churnList.length;
     const churn_rate = (active_paid + churn_count) > 0
       ? Math.round((churn_count / (active_paid + churn_count)) * 1000) / 10
@@ -422,6 +478,8 @@ export async function onRequest(context) {
       },
       funnel_by_source: funnelBySource,
       funnel_by_device: funnelByDevice,
+      funnel_v2,
+      funnel_v2_by_source,
       trial_behavior,
       trialing,
       active_paid,
