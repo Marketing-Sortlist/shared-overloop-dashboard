@@ -407,47 +407,162 @@ export async function onRequest(context) {
         ELSE 0
       END
     `;
+    const V2_COUNTS = `
+      COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
+      COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
+      COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
+      COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
+      COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
+      COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
+      COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
+      COUNT(*) FILTER (WHERE step_num >= 8) AS s8
+    `;
+    const V2_BASE = `
+      FROM companies
+      JOIN LATERAL (
+        SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+      ) u ON true
+      JOIN onboarding_v2_sessions s ON s.user_id = u.id
+      WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+      ${INTERNAL_FILTER}
+    `;
+
     let funnel_v2 = { steps: Array(8).fill(0), total: 0 };
     let funnel_v2_by_source = {};
+    let funnel_v2_by_device = {};
     try {
-      const fv2Rows = await runSQL(env, `
-        WITH raw AS (
-          SELECT
-            u.email,
-            ${SOURCE_CASE} AS source,
-            MAX(${V2_STEP}) AS step_num
-          FROM companies
-          JOIN LATERAL (
-            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
-          ) u ON true
-          JOIN onboarding_v2_sessions s ON s.user_id = u.id
-          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
-          ${INTERNAL_FILTER}
-          GROUP BY u.email, source
-        )
-        SELECT
-          source,
-          COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
-          COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
-          COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
-          COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
-          COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
-          COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
-          COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
-          COUNT(*) FILTER (WHERE step_num >= 8) AS s8
-        FROM raw
-        GROUP BY source
-      `);
+      const [fv2Rows, fv2DevRows] = await Promise.all([
+        runSQL(env, `
+          WITH raw AS (
+            SELECT u.email, ${SOURCE_CASE} AS source, MAX(${V2_STEP}) AS step_num
+            ${V2_BASE} GROUP BY u.email, source
+          )
+          SELECT source, ${V2_COUNTS} FROM raw GROUP BY source
+        `),
+        runSQL(env, `
+          WITH raw AS (
+            SELECT u.email,
+              CASE
+                WHEN COALESCE(companies.signup_user_agent,'') ~* '(mobile|android|iphone)' THEN 'mobile'
+                WHEN COALESCE(companies.signup_user_agent,'') ~* '(ipad|tablet)'           THEN 'tablet'
+                WHEN companies.signup_user_agent IS NOT NULL AND companies.signup_user_agent <> '' THEN 'desktop'
+                ELSE 'unknown'
+              END AS device,
+              MAX(${V2_STEP}) AS step_num
+            ${V2_BASE} GROUP BY u.email, device
+          )
+          SELECT device, ${V2_COUNTS} FROM raw GROUP BY device ORDER BY s1 DESC
+        `),
+      ]);
       const v2Totals = Array(8).fill(0);
       for (const [source, ...counts] of fv2Rows) {
         if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(8).fill(0);
-        counts.forEach((v, i) => {
-          funnel_v2_by_source[source][i] += Number(v);
-          v2Totals[i] += Number(v);
-        });
+        counts.forEach((v, i) => { funnel_v2_by_source[source][i] += Number(v); v2Totals[i] += Number(v); });
       }
       funnel_v2 = { steps: v2Totals, total: v2Totals[0] || 0 };
+      for (const [device, ...counts] of fv2DevRows) {
+        funnel_v2_by_device[device] = counts.map(Number);
+      }
     } catch (e) { funnel_v2 = { steps: Array(8).fill(0), total: 0, _error: e.message }; }
+
+    // 8b. V2 trial behaviour (trial_start = onboarding_v2_sessions.updated_at when completed)
+    let trial_behavior_v2 = null;
+    try {
+      const [tbV2Rows, tbV2SrcRows] = await Promise.all([
+        runSQL(env, `
+          SELECT
+            ROUND(AVG(EXTRACT(EPOCH FROM (sc.updated_at - companies.created_at)) / 86400)::numeric, 1)
+              AS avg_days_signup_to_trial,
+            ROUND(AVG(EXTRACT(EPOCH FROM (sub.subscribed_at - sc.updated_at)) / 86400)
+              FILTER (WHERE sub.subscribed_at IS NOT NULL AND sub.status = 'active')::numeric, 1)
+              AS avg_days_trial_to_active,
+            COUNT(*) FILTER (
+              WHERE sc.updated_at IS NOT NULL
+                AND NOW() > sc.updated_at + INTERVAL '14 days'
+                AND (sub.status IS NULL OR sub.status != 'active')
+            ) AS over_14d_not_active,
+            COUNT(*) FILTER (
+              WHERE sc.updated_at IS NOT NULL
+                AND NOW() <= sc.updated_at + INTERVAL '14 days'
+            ) AS in_14d_window
+          FROM companies
+          JOIN LATERAL (
+            SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          LEFT JOIN LATERAL (
+            SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
+          ) sub ON true
+          LEFT JOIN LATERAL (
+            SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id AND state = 'completed'
+            ORDER BY updated_at DESC LIMIT 1
+          ) sc ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          ${INTERNAL_FILTER}
+        `),
+        runSQL(env, `
+          SELECT ${SOURCE_CASE} AS source,
+            ROUND(AVG(EXTRACT(EPOCH FROM (sc.updated_at - companies.created_at)) / 86400)::numeric, 1)
+              AS avg_days_signup_to_trial
+          FROM companies
+          JOIN LATERAL (
+            SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          JOIN LATERAL (
+            SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id AND state = 'completed'
+            ORDER BY updated_at DESC LIMIT 1
+          ) sc ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          ${INTERNAL_FILTER}
+          GROUP BY 1 ORDER BY 2
+        `),
+      ]);
+      if (tbV2Rows[0]) {
+        const [avg_s2t, avg_t2a, over14, in14] = tbV2Rows[0];
+        const avg_signup_to_trial_by_source = {};
+        for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
+        trial_behavior_v2 = {
+          avg_days_signup_to_trial:  avg_s2t != null ? Number(avg_s2t) : null,
+          avg_days_trial_to_active:  avg_t2a != null ? Number(avg_t2a) : null,
+          over_14d_not_active:       Number(over14) || 0,
+          in_14d_window:             Number(in14)   || 0,
+          avg_signup_to_trial_by_source,
+        };
+      }
+    } catch (e) { trial_behavior_v2 = null; }
+
+    // 8c. Compare: V1 vs V2 signup / trialing / active within date range
+    let compare = null;
+    try {
+      const cmpRows = await runSQL(env, `
+        SELECT
+          COUNT(*) FILTER (WHERE s.user_id IS NULL)                                AS v1_signups,
+          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL)                            AS v2_signups,
+          COUNT(*) FILTER (WHERE sub.status = 'trialing' AND s.user_id IS NULL)   AS v1_trialing,
+          COUNT(*) FILTER (WHERE s.state = 'completed')                            AS v2_trialing,
+          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)     AS v1_active,
+          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL) AS v2_active
+        FROM companies
+        JOIN LATERAL (
+          SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
+        ) u ON true
+        LEFT JOIN LATERAL (
+          SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
+        ) sub ON true
+        LEFT JOIN LATERAL (
+          SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id ORDER BY updated_at DESC LIMIT 1
+        ) s ON true
+        WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+        ${INTERNAL_FILTER}
+      `);
+      if (cmpRows[0]) {
+        const [v1s, v2s, v1t, v2t, v1a, v2a] = cmpRows[0];
+        compare = {
+          v1_signups: Number(v1s), v2_signups: Number(v2s),
+          v1_trialing: Number(v1t), v2_trialing: Number(v2t),
+          v1_active: Number(v1a), v2_active: Number(v2a),
+        };
+      }
+    } catch (e) { compare = null; }
 
     // 9. Financial metrics
     const churn_count = churnList.length;
@@ -480,6 +595,9 @@ export async function onRequest(context) {
       funnel_by_device: funnelByDevice,
       funnel_v2,
       funnel_v2_by_source,
+      funnel_v2_by_device,
+      trial_behavior_v2,
+      compare,
       trial_behavior,
       trialing,
       active_paid,

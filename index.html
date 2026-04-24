@@ -294,7 +294,7 @@
   <p class="tab-goal"><strong>Goal:</strong> Find leaking buckets — which steps lose the most users, and does the drop vary by acquisition channel? Compare new (V2) vs legacy onboarding performance.</p>
 
   <nav class="funnel-sub-nav">
-    <button class="active" onclick="switchFunnelTab('v2')">New Onboarding (V2)</button>
+    <button class="active" onclick="switchFunnelTab('v2')">Onboarding v2</button>
     <button onclick="switchFunnelTab('v1')">Legacy Onboarding</button>
     <button onclick="switchFunnelTab('compare')">Compare</button>
   </nav>
@@ -302,17 +302,32 @@
   <!-- ── V2 Panel ── -->
   <div id="funnel-v2-panel" class="funnel-panel active">
     <div class="section-card">
-      <h3>New Onboarding Funnel — 8 steps, unique by email</h3>
+      <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+        <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
       </div>
       <div id="funnel-v2-steps"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
-      <h3>New Onboarding — Leaking Buckets by Channel</h3>
+      <h3>Onboarding v2 — Leaking Buckets by Channel</h3>
       <div class="source-grid" id="source-grid-v2">
         <div class="loading"><div class="spinner"></div></div>
       </div>
+    </div>
+    <div class="section-card">
+      <h3>Onboarding v2 — Leaking Buckets by Device</h3>
+      <div id="device-grid-v2" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+    <div class="section-card" style="overflow-x:auto">
+      <h3>Onboarding v2 — Channel Breakdown Table</h3>
+      <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3>Onboarding v2 — Trial Behaviour</h3>
+      <div id="trial-behavior-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
 
@@ -351,7 +366,7 @@
   <!-- ── Compare Panel ── -->
   <div id="funnel-compare-panel" class="funnel-panel">
     <div class="section-card">
-      <h3>V2 vs Legacy — Conversion Rates Comparison</h3>
+      <h3>Legacy vs Onboarding v2 — Signups · Trialing · Active</h3>
       <div id="funnel-compare"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
@@ -703,6 +718,9 @@ async function loadAll() {
   renderTables();
   renderFunnelV2Steps();
   renderSourceGridV2();
+  renderDeviceGridV2();
+  renderSourceTableV2();
+  renderTrialBehaviorV2();
   renderFunnelSteps();
   renderSourceGrid();
   renderDeviceGrid();
@@ -1119,7 +1137,10 @@ function renderFunnelV2Filters() {
   const { mb } = state;
   if (!mb) return;
   const fbs = mb.funnel_v2_by_source || {};
+  const fbd = mb.funnel_v2_by_device || {};
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
+  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
+
   document.getElementById('funnel-v2-src-pills').innerHTML =
     ['all', ...srcKeys].map(s => {
       const isAll = s === 'all';
@@ -1128,6 +1149,16 @@ function renderFunnelV2Filters() {
       return `<button class="pill${active ? ' active' : ''}" style="${active ? `background:${color};border-color:${color};color:#fff` : ''}"
         onclick="setFunnelV2Filter('source', '${s}')">${isAll ? 'All' : srcLabel(s)}</button>`;
     }).join('');
+
+  document.getElementById('funnel-v2-dev-pills').innerHTML = devKeys.length
+    ? ['all', ...devKeys].map(d => {
+        const isAll = d === 'all';
+        const active = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'device' && funnelV2Filter.value === d);
+        const color = isAll ? 'var(--teal)' : ({ desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' }[d] || '#94a3b8');
+        return `<button class="pill${active ? ' active' : ''}" style="${active ? `background:${color};border-color:${color};color:#fff` : ''}"
+          onclick="setFunnelV2Filter('device', '${d}')">${isAll ? 'All' : d}</button>`;
+      }).join('')
+    : '<span style="color:var(--muted);font-size:11px">No device data</span>';
 }
 
 function renderFunnelV2Steps() {
@@ -1140,6 +1171,8 @@ function renderFunnelV2Steps() {
   let steps;
   if (funnelV2Filter.type === 'source') {
     steps = mb.funnel_v2_by_source?.[funnelV2Filter.value] || mb.funnel_v2.steps;
+  } else if (funnelV2Filter.type === 'device') {
+    steps = mb.funnel_v2_by_device?.[funnelV2Filter.value] || mb.funnel_v2.steps;
   } else {
     steps = mb.funnel_v2.steps;
   }
@@ -1175,8 +1208,11 @@ function renderFunnelV2Steps() {
       const gW = (gV / srcTot) * pctTotal;
       const oW = (oV / srcTot) * pctTotal;
       barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
-    } else {
+    } else if (funnelV2Filter.type === 'source') {
       const color = srcColor(funnelV2Filter.value);
+      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+    } else {
+      const color = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' }[funnelV2Filter.value] || '#94a3b8';
       barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
     }
 
@@ -1231,76 +1267,167 @@ function renderSourceGridV2() {
   }).join('');
 }
 
+function renderDeviceGridV2() {
+  const { mb } = state;
+  const el = document.getElementById('device-grid-v2');
+  if (!el) return;
+  const fbd = mb?.funnel_v2_by_device;
+  if (!fbd || Object.keys(fbd).length === 0) { el.innerHTML = '<p class="no-data">No device data</p>'; return; }
+  if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
+
+  const DEVICE_COLOR = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' };
+  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing'];
+
+  el.innerHTML = Object.entries(fbd).sort((a,b)=>(b[1][0]||0)-(a[1][0]||0)).map(([device, vals]) => {
+    const color = DEVICE_COLOR[device] || '#94a3b8';
+    const base  = vals[0] || 1;
+    return `<div class="source-col">
+      <h4><span class="src-dot" style="background:${color}"></span>${device} <span style="color:var(--muted);font-weight:400">${fmtN(vals[0]||0)}</span></h4>
+      ${stepLabels.map((label, i) => {
+        const v   = vals[i] || 0;
+        const pct = Math.round((v / base) * 100);
+        const drop = i > 0 ? Math.round(((vals[i-1]||0) - v) / (vals[i-1]||1) * 100) : null;
+        const dropBadge = drop !== null && drop > 0 ? `<span style="color:var(--red);font-size:10px;margin-left:4px">↓${drop}%</span>` : '';
+        return `<div class="mini-step">
+          <div class="mini-step-label">
+            <span>${label}${dropBadge}</span>
+            <strong>${fmtN(v)}</strong><span style="margin-left:4px;color:var(--muted)">${pct}%</span>
+          </div>
+          <div class="mini-bar-bg"><div class="mini-bar" style="width:${pct}%;background:${color}"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderSourceTableV2() {
+  const { mb } = state;
+  const el = document.getElementById('source-table-v2');
+  if (!mb?.funnel_v2_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const fbs     = mb.funnel_v2_by_source;
+  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
+
+  const rows = srcKeys.map(key => {
+    const v        = fbs[key] || [];
+    const signups  = v[0] || 0;
+    const domain   = v[1] || 0;
+    const stripe   = v[6] || 0;
+    const trialing = v[7] || 0;
+    const rTrial   = signups > 0 ? ((trialing / signups) * 100).toFixed(1) + '%' : '–';
+    return `<tr>
+      <td>${srcLabel(key)}</td>
+      <td>${fmtN(signups)}</td>
+      <td>${fmtN(domain)}</td>
+      <td>${fmtN(stripe)}</td>
+      <td>${fmtN(trialing)}</td>
+      <td>${rTrial}</td>
+    </tr>`;
+  });
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Source</th><th>Signups</th><th>Domain</th><th>Stripe</th><th>Trialing</th><th>Signup→Trial</th>
+    </tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>`;
+}
+
+function renderTrialBehaviorV2() {
+  const { mb } = state;
+  const el = document.getElementById('trial-behavior-v2');
+  if (!el) return;
+  const tb = mb?.trial_behavior_v2;
+  if (!tb) { el.innerHTML = '<p class="no-data">No data yet — trial behaviour populates once v2 users have been in trial for some time</p>'; return; }
+
+  const fmtDays = v => v != null ? parseFloat(v).toFixed(1) + ' days' : '–';
+
+  const srcMap = tb.avg_signup_to_trial_by_source || {};
+  const srcOrder = ['meta', 'google', 'organic'];
+  const otherSrcs = Object.keys(srcMap).filter(k => !srcOrder.includes(k));
+  const allSrcs = [...srcOrder, ...otherSrcs].filter(k => srcMap[k] != null);
+  const srcRows = allSrcs.map(k =>
+    `<tr><td style="padding:4px 8px;color:var(--muted)">${srcLabel(k)}</td><td style="padding:4px 8px;font-weight:600">${fmtDays(srcMap[k])}</td></tr>`
+  ).join('');
+
+  el.innerHTML = `<div class="fin-grid" style="margin:0 0 16px">
+    <div class="fin-card">
+      <div class="fin-label">Avg: Signup → Trial</div>
+      <div class="fin-value">${fmtDays(tb.avg_days_signup_to_trial)}</div>
+      <div class="fin-sub">signup to v2 onboarding completed</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">Avg: Trial → Active</div>
+      <div class="fin-value">${fmtDays(tb.avg_days_trial_to_active)}</div>
+      <div class="fin-sub">v2 completed to first paid (subscribed_at)</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">Past 14d — Not Active</div>
+      <div class="fin-value ${tb.over_14d_not_active > 0 ? 'red' : ''}">${fmtN(tb.over_14d_not_active)}</div>
+      <div class="fin-sub">&gt;14 days since trial start, not yet active</div>
+    </div>
+    <div class="fin-card">
+      <div class="fin-label">In 14d Window</div>
+      <div class="fin-value yellow">${fmtN(tb.in_14d_window)}</div>
+      <div class="fin-sub">currently within 14-day trial window</div>
+    </div>
+  </div>
+  ${allSrcs.length ? `
+  <div style="margin-top:4px">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Avg Signup → Trial by channel</div>
+    <table style="border-collapse:collapse;font-size:12px">${srcRows}</table>
+  </div>` : ''}`;
+}
+
 // ── Compare ───────────────────────────────────────────────────────────────
 
 function renderFunnelCompare() {
   const { mb } = state;
   const el = document.getElementById('funnel-compare');
-  if (!mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  if (!mb?.compare) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const v1 = mb.funnel?.steps || [];
-  const v2 = mb.funnel_v2?.steps || [];
-  const v1Total = v1[0] || 0;
-  const v2Total = v2[0] || 0;
-
-  const pct = (n, base) => base > 0 ? Math.round((n / base) * 100) + '%' : '–';
-  const bar = (val, base, color) => {
-    const w = base > 0 ? Math.round((val / base) * 100) : 0;
-    return `<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:4px">
-      <div style="height:8px;width:${w}%;background:${color};border-radius:4px;transition:width .4s"></div>
-    </div>`;
+  const c = mb.compare;
+  const pct = (n, base) => base > 0 ? (n / base * 100).toFixed(1) + '%' : '–';
+  const bar = (n, base, color) => {
+    const w = base > 0 ? Math.round(n / base * 100) : 0;
+    return `<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:3px">
+      <div style="height:6px;width:${w}%;background:${color};border-radius:3px;transition:width .4s"></div></div>`;
   };
 
-  // Key conversion milestones comparison
-  const milestones = [
-    { label: 'Entry (Signup)',        v1n: v1[0], v2n: v2[0] },
-    { label: 'Mid-funnel',            v1n: v1[3], v2n: v2[2] }, // V1 step4 / V2 step3
-    { label: 'Intent (Stripe/Trial)', v1n: v1[6], v2n: v2[6] }, // V1 step7=congrats / V2 step7=stripe
-    { label: 'Trialing',              v1n: v1[7], v2n: v2[7] }, // V1 step8 / V2 step8
-    { label: 'Active',                v1n: v1[8], v2n: null  }, // V1 step9 only
+  const rows = [
+    { label: 'Signups',  v1: c.v1_signups,  v2: c.v2_signups,  note: 'Companies created in period (no v2 session vs has v2 session)' },
+    { label: 'Trialing', v1: c.v1_trialing, v2: c.v2_trialing, note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
+    { label: 'Active',   v1: c.v1_active,   v2: c.v2_active,   note: 'Both: sub.status = active' },
   ];
 
-  const tableRows = milestones.map(m => {
-    const v1Pct = pct(m.v1n, v1Total);
-    const v2Pct = m.v2n != null ? pct(m.v2n, v2Total) : '–';
-    return `<tr>
-      <td style="padding:10px 12px;font-weight:500">${m.label}</td>
-      <td style="padding:10px 12px;text-align:center">${fmtN(m.v1n)}</td>
-      <td style="padding:10px 12px;text-align:center;color:var(--muted)">${v1Pct}</td>
-      <td style="padding:10px 12px;text-align:center">${m.v2n != null ? fmtN(m.v2n) : '–'}</td>
-      <td style="padding:10px 12px;text-align:center;color:var(--muted)">${v2Pct}</td>
-    </tr>`;
-  }).join('');
+  const tableRows = rows.map(r => `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:12px 14px;font-weight:600">${r.label}</td>
+      <td style="padding:12px 14px;text-align:center">
+        <div style="font-size:16px;font-weight:700">${fmtN(r.v1)}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v1, c.v1_signups) + ' of signups' : '—'}</div>
+        ${r.label !== 'Signups' ? bar(r.v1, c.v1_signups, 'var(--accent)') : ''}
+      </td>
+      <td style="padding:12px 14px;text-align:center">
+        <div style="font-size:16px;font-weight:700">${fmtN(r.v2)}</div>
+        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v2, c.v2_signups) + ' of signups' : '—'}</div>
+        ${r.label !== 'Signups' ? bar(r.v2, c.v2_signups, 'var(--teal)') : ''}
+      </td>
+      <td style="padding:12px 14px;font-size:11px;color:var(--muted)">${r.note}</td>
+    </tr>`).join('');
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-      <div style="background:var(--surface2);border-radius:10px;padding:16px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Legacy (V1) — Total Signups</div>
-        <div style="font-size:24px;font-weight:700">${fmtN(v1Total)}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">Trialing: <strong style="color:var(--text)">${fmtN(v1[7])}</strong> (${pct(v1[7], v1Total)}) &nbsp;·&nbsp; Active: <strong style="color:var(--green)">${fmtN(v1[8])}</strong> (${pct(v1[8], v1Total)})</div>
-        ${bar(v1[8], v1Total, 'var(--green)')}
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:16px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">New Onboarding (V2) — Total Signups</div>
-        <div style="font-size:24px;font-weight:700">${fmtN(v2Total)}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">Trialing: <strong style="color:var(--teal)">${fmtN(v2[7])}</strong> (${pct(v2[7], v2Total)})</div>
-        ${bar(v2[7], v2Total, 'var(--teal)')}
-      </div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
-        <tr style="border-bottom:1px solid var(--border);color:var(--muted)">
-          <th style="padding:8px 12px;text-align:left">Milestone</th>
-          <th style="padding:8px 12px;text-align:center">V1 count</th>
-          <th style="padding:8px 12px;text-align:center">V1 %</th>
-          <th style="padding:8px 12px;text-align:center">V2 count</th>
-          <th style="padding:8px 12px;text-align:center">V2 %</th>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px"></th>
+          <th style="padding:10px 14px;text-align:center;color:var(--accent)">Legacy</th>
+          <th style="padding:10px 14px;text-align:center;color:var(--teal)">Onboarding v2</th>
+          <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px">Definition</th>
         </tr>
       </thead>
-      <tbody style="border-top:1px solid var(--border)">${tableRows}</tbody>
-    </table>
-    <p style="margin-top:12px;font-size:11px;color:var(--muted)">V1 mid-funnel = Pitch Index (step 4) · V2 mid-funnel = Business Details (step 3) · V1 intent = Congrats (step 7) · V2 intent = Moved to Stripe (step 7)</p>
-  `;
+      <tbody>${tableRows}</tbody>
+    </table>`;
 }
 
 // ══ FUNNEL (LEGACY V1) ════════════════════════════════════════════════════
