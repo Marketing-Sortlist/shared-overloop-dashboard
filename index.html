@@ -423,6 +423,19 @@ const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustp
 const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
 function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
 function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
+
+// Merge two daily arrays (same structure: [{date, count, meta, google, ...}])
+function mergeDailyMaps(a, b) {
+  const m = {};
+  for (const d of [...(a || []), ...(b || [])]) {
+    if (!m[d.date]) m[d.date] = { date: d.date, count: 0 };
+    for (const [k, v] of Object.entries(d)) {
+      if (k === 'date') continue;
+      m[d.date][k] = (m[d.date][k] || 0) + Number(v);
+    }
+  }
+  return Object.values(m).sort((x, y) => x.date.localeCompare(y.date));
+}
 // Get all source keys from period data, ordered: meta, google, known, organic last
 function getSources(data) {
   const all = new Set();
@@ -742,16 +755,16 @@ function renderKPIs() {
   const gSpend = dailySpend(google);
   const tot    = mSpend + gSpend;
 
-  const fbs      = mb?.funnel_by_source || {};
+  const fbs      = mb?.funnel_by_source    || {};
+  const fbs2     = mb?.funnel_v2_by_source || {};
   const sigs     = mb ? mb.signups_daily.reduce((s, d) => s + d.count, 0) : null;
-  // Paid signups = meta + google signups (users with a paid channel attribution)
-  const metaSig  = fbs.meta?.[0]   || 0;
-  const googleSig= fbs.google?.[0] || 0;
+  const metaSig  = (fbs.meta?.[0]  || 0) + (fbs2.meta?.[0]  || 0);
+  const googleSig= (fbs.google?.[0]|| 0) + (fbs2.google?.[0]|| 0);
   const paidSigs = metaSig + googleSig;
 
-  // Paid trialing/active from funnel_by_source (step 8 = trialing index 7, step 9 = active index 8)
-  const paidTrialing = (fbs.meta?.[7] || 0) + (fbs.google?.[7] || 0);
-  const paidActive   = (fbs.meta?.[8] || 0) + (fbs.google?.[8] || 0);
+  // Combined V1 (idx7=trialing, idx8=active) + V2 (idx7=trialing/completed, idx8=active)
+  const paidTrialing = (fbs.meta?.[7] || 0) + (fbs.google?.[7] || 0) + (fbs2.meta?.[7] || 0) + (fbs2.google?.[7] || 0);
+  const paidActive   = (fbs.meta?.[8] || 0) + (fbs.google?.[8] || 0) + (fbs2.meta?.[8] || 0) + (fbs2.google?.[8] || 0);
 
   // % of signups from paid channels
   const paidPct = sigs > 0 ? Math.round((paidSigs / sigs) * 100) : null;
@@ -791,11 +804,13 @@ function renderCostEvolution() {
   const gDaily    = aggregateByGranularity(google?.daily || [], currentGranularity);
   const mByD      = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
   const gByD      = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
-  const sigsByD   = Object.fromEntries((mb.signups_daily      || []).map(d => [d.date, d]));
-  const trlsByD   = Object.fromEntries((mb.trials_daily       || []).map(d => [d.date, d]));
-  const actsByD   = Object.fromEntries((mb.activations_daily  || []).map(d => [d.date, d]));
-  const hasTrl    = (mb.trials_daily      || []).length > 0;
-  const hasAct    = (mb.activations_daily || []).length > 0;
+  const sigsByD   = Object.fromEntries((mb.signups_daily || []).map(d => [d.date, d]));
+  const trlsMerged = mergeDailyMaps(mb.trials_daily,      mb.trials_v2_daily);
+  const actsMerged = mergeDailyMaps(mb.activations_daily, mb.activations_v2_daily);
+  const trlsByD   = Object.fromEntries(trlsMerged.map(d => [d.date, d]));
+  const actsByD   = Object.fromEntries(actsMerged.map(d => [d.date, d]));
+  const hasTrl    = trlsMerged.length > 0;
+  const hasAct    = actsMerged.length > 0;
 
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
@@ -851,14 +866,14 @@ function renderCostBySource() {
   const gSpend = dailySpend(google);
   const tot    = mSpend + gSpend;
 
-  const fbs = mb?.funnel_by_source || {};
-  // step indices (0-based): 0=all signups, 7=trialing (step8), 8=active (step9)
-  const metaSig    = fbs.meta?.[0]   || 0;
-  const googleSig  = fbs.google?.[0] || 0;
-  const metaTrial  = fbs.meta?.[7]   || 0;
-  const googleTrial= fbs.google?.[7] || 0;
-  const metaAct    = fbs.meta?.[8]   || 0;
-  const googleAct  = fbs.google?.[8] || 0;
+  const fbs  = mb?.funnel_by_source    || {};
+  const fbs2 = mb?.funnel_v2_by_source || {};
+  const metaSig    = (fbs.meta?.[0]  || 0) + (fbs2.meta?.[0]  || 0);
+  const googleSig  = (fbs.google?.[0]|| 0) + (fbs2.google?.[0]|| 0);
+  const metaTrial  = (fbs.meta?.[7]  || 0) + (fbs2.meta?.[7]  || 0);
+  const googleTrial= (fbs.google?.[7]|| 0) + (fbs2.google?.[7]|| 0);
+  const metaAct    = (fbs.meta?.[8]  || 0) + (fbs2.meta?.[8]  || 0);
+  const googleAct  = (fbs.google?.[8]|| 0) + (fbs2.google?.[8]|| 0);
 
   const rows = [
     { src: 'Meta',        spend: mSpend, sig: metaSig,              trial: metaTrial,              active: metaAct },
@@ -896,12 +911,14 @@ function renderCostByPeriod() {
   const mSpendByD = Object.fromEntries(mDaily.map(d => [d.date, d.spend || 0]));
   const gSpendByD = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
 
-  const sigsByD = Object.fromEntries((mb.signups_daily     || []).map(d => [d.date, d]));
-  const trlsByD = Object.fromEntries((mb.trials_daily      || []).map(d => [d.date, d]));
-  const actsByD = Object.fromEntries((mb.activations_daily || []).map(d => [d.date, d]));
+  const sigsByD = Object.fromEntries((mb.signups_daily || []).map(d => [d.date, d]));
+  const trlsMrg = mergeDailyMaps(mb.trials_daily,      mb.trials_v2_daily);
+  const actsMrg = mergeDailyMaps(mb.activations_daily, mb.activations_v2_daily);
+  const trlsByD = Object.fromEntries(trlsMrg.map(d => [d.date, d]));
+  const actsByD = Object.fromEntries(actsMrg.map(d => [d.date, d]));
 
-  const hasTrl = (mb.trials_daily      || []).length > 0;
-  const hasAct = (mb.activations_daily || []).length > 0;
+  const hasTrl = trlsMrg.length > 0;
+  const hasAct = actsMrg.length > 0;
 
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
@@ -1124,7 +1141,7 @@ function switchFunnelTab(tab) {
 // ── V2 Funnel ─────────────────────────────────────────────────────────────
 
 function setFunnelV2Filter(type, value) {
-  if (funnelV2Filter.type === type && funnelV2Filter.value === value) {
+  if (value === 'all' || (funnelV2Filter.type === type && funnelV2Filter.value === value)) {
     funnelV2Filter = { type: null, value: null };
   } else {
     funnelV2Filter = { type, value };
@@ -1143,20 +1160,20 @@ function renderFunnelV2Filters() {
 
   document.getElementById('funnel-v2-src-pills').innerHTML =
     ['all', ...srcKeys].map(s => {
-      const isAll = s === 'all';
-      const active = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'source' && funnelV2Filter.value === s);
-      const color = isAll ? 'var(--teal)' : srcColor(s);
-      return `<button class="pill${active ? ' active' : ''}" style="${active ? `background:${color};border-color:${color};color:#fff` : ''}"
-        onclick="setFunnelV2Filter('source', '${s}')">${isAll ? 'All' : srcLabel(s)}</button>`;
+      const isAll   = s === 'all';
+      const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'source' && funnelV2Filter.value === s);
+      const lbl     = isAll ? 'All' : srcLabel(s);
+      const n       = isAll ? '' : ` <span style="color:var(--muted);margin-left:2px">${fmtN(fbs[s]?.[0] || 0)}</span>`;
+      const onclick = isAll ? `setFunnelV2Filter('source','all')` : `setFunnelV2Filter('source','${s}')`;
+      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${lbl}${n}</button>`;
     }).join('');
 
   document.getElementById('funnel-v2-dev-pills').innerHTML = devKeys.length
     ? ['all', ...devKeys].map(d => {
-        const isAll = d === 'all';
-        const active = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'device' && funnelV2Filter.value === d);
-        const color = isAll ? 'var(--teal)' : ({ desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' }[d] || '#94a3b8');
-        return `<button class="pill${active ? ' active' : ''}" style="${active ? `background:${color};border-color:${color};color:#fff` : ''}"
-          onclick="setFunnelV2Filter('device', '${d}')">${isAll ? 'All' : d}</button>`;
+        const isAll   = d === 'all';
+        const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'device' && funnelV2Filter.value === d);
+        const onclick = isAll ? `setFunnelV2Filter('device','all')` : `setFunnelV2Filter('device','${d}')`;
+        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${isAll ? 'All' : d}</button>`;
       }).join('')
     : '<span style="color:var(--muted);font-size:11px">No device data</span>';
 }
@@ -1189,6 +1206,7 @@ function renderFunnelV2Steps() {
     { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
     { label: 'Step 7 — Moved to Stripe',     val: steps[6], idx: 6 },
     { label: 'Step 8 — Trialing',            val: steps[7], idx: 7 },
+    { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
   ];
 
   el.innerHTML = rows.map((row, i) => {
@@ -1239,7 +1257,7 @@ function renderSourceGridV2() {
 
   const fbs = mb.funnel_v2_by_source;
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing'];
+  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
 
   el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
   el.innerHTML = srcKeys.map(key => {
@@ -1276,7 +1294,7 @@ function renderDeviceGridV2() {
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
   const DEVICE_COLOR = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' };
-  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing'];
+  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
 
   el.innerHTML = Object.entries(fbd).sort((a,b)=>(b[1][0]||0)-(a[1][0]||0)).map(([device, vals]) => {
     const color = DEVICE_COLOR[device] || '#94a3b8';
@@ -1314,20 +1332,24 @@ function renderSourceTableV2() {
     const domain   = v[1] || 0;
     const stripe   = v[6] || 0;
     const trialing = v[7] || 0;
+    const active   = v[8] || 0;
     const rTrial   = signups > 0 ? ((trialing / signups) * 100).toFixed(1) + '%' : '–';
+    const rActive  = signups > 0 ? ((active   / signups) * 100).toFixed(1) + '%' : '–';
     return `<tr>
       <td>${srcLabel(key)}</td>
       <td>${fmtN(signups)}</td>
       <td>${fmtN(domain)}</td>
       <td>${fmtN(stripe)}</td>
       <td>${fmtN(trialing)}</td>
+      <td>${fmtN(active)}</td>
       <td>${rTrial}</td>
+      <td>${rActive}</td>
     </tr>`;
   });
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Source</th><th>Signups</th><th>Domain</th><th>Stripe</th><th>Trialing</th><th>Signup→Trial</th>
+      <th>Source</th><th>Signups</th><th>Domain</th><th>Stripe</th><th>Trialing</th><th>Active</th><th>Signup→Trial</th><th>Signup→Active</th>
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>`;
@@ -1748,11 +1770,13 @@ function renderFinancials() {
       s: 'sum of active subscriptions (current)', c: 'teal-c' },
     { l: 'Active Paid',      v: fmtN(fin.active_paid),
       s: 'current self-service customers', c: 'green' },
-    { l: 'Trialing',         v: fmtN(fin.trialing),
-      s: 'currently in free trial', c: 'yellow' },
-    { l: 'Trial → Active',   v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–',
+    { l: 'In 14d Window',    v: fmtN((mb.trial_behavior?.in_14d_window || 0) + (mb.trial_behavior_v2?.in_14d_window || 0)),
+      s: 'within 14-day trial window (Legacy + V2, selected period)', c: 'yellow' },
+    { l: 'Trial → Active',  v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–',
       s: 'active ÷ (active+trialing) — current',
       c: fin.trial_to_active_rate > 20 ? 'green' : 'yellow' },
+    { l: 'Canceled (trial)', v: mb.canceled_trial_stats ? fmtN(mb.canceled_trial_stats.canceled_trial) : '–',
+      s: mb.canceled_trial_stats ? `${mb.canceled_trial_stats.canceled_trial_rate}% of all who started trial — never paid` : 'all-time', c: mb.canceled_trial_stats?.canceled_trial > 0 ? 'red' : '' },
     { l: 'Churn Rate',       v: fin.churn_rate != null ? fin.churn_rate + '%' : '–',
       s: 'churned ÷ (active+churned) — lifetime', c: fin.churn > 0 ? 'red' : '' },
     { l: 'ARPU',             v: arpu ? fmtCur(arpu) : '–',

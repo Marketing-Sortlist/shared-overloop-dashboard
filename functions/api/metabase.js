@@ -396,14 +396,16 @@ export async function onRequest(context) {
     // 8. V2 funnel
     const V2_STEP = `
       CASE
-        WHEN s.state = 'email_confirmed'           THEN 1
-        WHEN s.state = 'domain_provided'           THEN 2
-        WHEN s.state = 'business_details_accepted' THEN 3
-        WHEN s.state = 'icp_accepted'              THEN 4
-        WHEN s.state = 'channels_accepted'         THEN 5
-        WHEN s.state = 'sequence_accepted'         THEN 6
-        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN sub.status IN ('active','past_due')
+          OR (sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL) THEN 9
         WHEN s.state = 'completed'                 THEN 8
+        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN s.state = 'sequence_accepted'         THEN 6
+        WHEN s.state = 'channels_accepted'         THEN 5
+        WHEN s.state = 'icp_accepted'              THEN 4
+        WHEN s.state = 'business_details_accepted' THEN 3
+        WHEN s.state = 'domain_provided'           THEN 2
+        WHEN s.state = 'email_confirmed'           THEN 1
         ELSE 0
       END
     `;
@@ -415,7 +417,8 @@ export async function onRequest(context) {
       COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
       COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
       COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
-      COUNT(*) FILTER (WHERE step_num >= 8) AS s8
+      COUNT(*) FILTER (WHERE step_num >= 8) AS s8,
+      COUNT(*) FILTER (WHERE step_num >= 9) AS s9
     `;
     const V2_BASE = `
       FROM companies
@@ -423,13 +426,17 @@ export async function onRequest(context) {
         SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
       ) u ON true
       JOIN onboarding_v2_sessions s ON s.user_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
+      ) sub ON true
       WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
       ${INTERNAL_FILTER}
     `;
 
-    let funnel_v2 = { steps: Array(8).fill(0), total: 0 };
+    let funnel_v2 = { steps: Array(9).fill(0), total: 0 };
     let funnel_v2_by_source = {};
     let funnel_v2_by_device = {};
+    let trials_v2_daily = [], activations_v2_daily = [];
     try {
       const [fv2Rows, fv2DevRows] = await Promise.all([
         runSQL(env, `
@@ -454,18 +461,73 @@ export async function onRequest(context) {
           SELECT device, ${V2_COUNTS} FROM raw GROUP BY device ORDER BY s1 DESC
         `),
       ]);
-      const v2Totals = Array(8).fill(0);
+      const v2Totals = Array(9).fill(0);
       for (const [source, ...counts] of fv2Rows) {
-        if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(8).fill(0);
+        if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(9).fill(0);
         counts.forEach((v, i) => { funnel_v2_by_source[source][i] += Number(v); v2Totals[i] += Number(v); });
       }
       funnel_v2 = { steps: v2Totals, total: v2Totals[0] || 0 };
       for (const [device, ...counts] of fv2DevRows) {
         funnel_v2_by_device[device] = counts.map(Number);
       }
-    } catch (e) { funnel_v2 = { steps: Array(8).fill(0), total: 0, _error: e.message }; }
+    } catch (e) { funnel_v2 = { steps: Array(9).fill(0), total: 0, _error: e.message }; }
 
-    // 8b. V2 trial behaviour (trial_start = onboarding_v2_sessions.updated_at when completed)
+    // V2 per-period trials / activations (same structure as V1 trials_daily / activations_daily)
+    try {
+      const v2PeriodRows = await runSQL(env, `
+        WITH raw AS (
+          SELECT
+            DATE_TRUNC('${granularity}', companies.created_at)::date AS period,
+            u.email,
+            ${SOURCE_CASE} AS source,
+            MAX(${V2_STEP}) AS step_num
+          ${V2_BASE} GROUP BY period, u.email, source
+        )
+        SELECT period::text, source,
+          COUNT(*) FILTER (WHERE step_num >= 8) AS trialing,
+          COUNT(*) FILTER (WHERE step_num >= 9) AS active
+        FROM raw GROUP BY period, source ORDER BY period
+      `);
+      const tMap = {}, aMap = {};
+      for (const [period, source, t, a] of v2PeriodRows) {
+        const d = String(period).slice(0, 10);
+        if (!tMap[d]) tMap[d] = { date: d, count: 0 };
+        tMap[d][source] = (tMap[d][source] || 0) + Number(t);
+        tMap[d].count += Number(t);
+        if (!aMap[d]) aMap[d] = { date: d, count: 0 };
+        aMap[d][source] = (aMap[d][source] || 0) + Number(a);
+        aMap[d].count += Number(a);
+      }
+      trials_v2_daily      = Object.values(tMap).sort((x, y) => x.date.localeCompare(y.date));
+      activations_v2_daily = Object.values(aMap).sort((x, y) => x.date.localeCompare(y.date));
+    } catch (_) {}
+
+    // 8b. Canceled-during-trial stats (all-time, no date filter)
+    let canceled_trial_stats = null;
+    try {
+      const ctRows = await runSQL(env, `
+        SELECT
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL)     AS canceled_trial,
+          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL)  AS canceled_active,
+          COUNT(*) FILTER (WHERE sub.status = 'trialing')                                    AS currently_trialing,
+          COUNT(*) FILTER (WHERE sub.status = 'active')                                      AS currently_active
+        FROM subscriptions sub
+        JOIN LATERAL (SELECT * FROM companies WHERE id = sub.company_id LIMIT 1) c ON true
+        JOIN LATERAL (SELECT * FROM users WHERE company_id = sub.company_id ORDER BY id ASC LIMIT 1) u ON true
+        WHERE u.email NOT ILIKE '%sortlist.com%' AND u.email NOT ILIKE '%overloop%'
+          AND c.name NOT ILIKE '%sortlist%'       AND c.name NOT ILIKE '%overloop%'
+      `);
+      if (ctRows[0]) {
+        const [ct, ca, ctr, cur] = ctRows[0];
+        const total = Number(ct) + Number(ca) + Number(ctr) + Number(cur);
+        canceled_trial_stats = {
+          canceled_trial:      Number(ct),
+          canceled_trial_rate: total > 0 ? Math.round(Number(ct) / total * 1000) / 10 : 0,
+        };
+      }
+    } catch (e) { canceled_trial_stats = null; }
+
+    // 8d. V2 trial behaviour (trial_start = onboarding_v2_sessions.updated_at when completed)
     let trial_behavior_v2 = null;
     try {
       const [tbV2Rows, tbV2SrcRows] = await Promise.all([
@@ -602,7 +664,10 @@ export async function onRequest(context) {
       funnel_v2,
       funnel_v2_by_source,
       funnel_v2_by_device,
+      trials_v2_daily,
+      activations_v2_daily,
       trial_behavior_v2,
+      canceled_trial_stats,
       compare,
       trial_behavior,
       trialing,
