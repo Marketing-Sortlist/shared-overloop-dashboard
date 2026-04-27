@@ -291,6 +291,7 @@ export async function onRequest(context) {
             SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
           ) u ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+            AND NOT EXISTS (SELECT 1 FROM onboarding_v2_sessions WHERE onboarding_v2_sessions.user_id = u.id)
           ${INTERNAL_FILTER}
         `),
         runSQL(env, `
@@ -307,6 +308,7 @@ export async function onRequest(context) {
           ) u ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
             AND sub.trial_start IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM onboarding_v2_sessions WHERE onboarding_v2_sessions.user_id = u.id)
           ${INTERNAL_FILTER}
           GROUP BY 1
           ORDER BY 2
@@ -516,6 +518,7 @@ export async function onRequest(context) {
         JOIN LATERAL (SELECT * FROM users WHERE company_id = sub.company_id ORDER BY id ASC LIMIT 1) u ON true
         WHERE u.email NOT ILIKE '%sortlist.com%' AND u.email NOT ILIKE '%overloop%'
           AND c.name NOT ILIKE '%sortlist%'       AND c.name NOT ILIKE '%overloop%'
+          AND EXISTS (SELECT 1 FROM onboarding_v2_sessions WHERE company_id = c.id AND user_id = u.id)
       `);
       if (ctRows[0]) {
         const [ct, ca, ctr, cur] = ctRows[0];

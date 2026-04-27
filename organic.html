@@ -258,6 +258,11 @@
     <div class="chart-wrap"><canvas id="leadsChart"></canvas></div>
   </div>
 
+  <div class="section-card">
+    <h3>Organic Funnel — Signup → Trial → Active → Canceled</h3>
+    <div class="chart-wrap" style="height:180px"><canvas id="funnelChart"></canvas></div>
+  </div>
+
   <!-- GA4 placeholder -->
   <div class="placeholder-card">
     <div class="placeholder-icon">📊</div>
@@ -296,7 +301,7 @@
 let state = { gsc: null, leads: null };
 let compareState = { gsc: null, leads: null };
 let compareEnabled = false, compareMode = 'previous';
-let trafficChart, ctrChart, posChart, leadsChart;
+let trafficChart, ctrChart, posChart, leadsChart, funnelChart;
 let dp = { unit: 'week', mode: 'last_n', n: 4 };
 let activeSince = '', activeUntil = '';
 let currentTab = 'overview';
@@ -555,6 +560,7 @@ function renderAll() {
     renderCTRChart();
     renderPositionChart();
     renderLeadsChart();
+    renderFunnelChart();
   } else if (currentTab === 'queries') {
     renderQueriesTable();
   } else if (currentTab === 'pages') {
@@ -564,16 +570,16 @@ function renderAll() {
 
 // ── KPIs ───────────────────────────────────────────────────────────────────────
 function kpiMetrics(g, l) {
-  const totalClicks  = g ? g.daily.reduce((s, r) => s + r.clicks, 0) : null;
-  const totalImpr    = g ? g.daily.reduce((s, r) => s + r.impressions, 0) : null;
-  const avgCTR       = totalClicks != null && totalImpr > 0 ? totalClicks / totalImpr : null;
-  const avgPos       = g && totalImpr > 0
+  const totalClicks   = g ? g.daily.reduce((s, r) => s + r.clicks, 0) : null;
+  const totalImpr     = g ? g.daily.reduce((s, r) => s + r.impressions, 0) : null;
+  const avgCTR        = totalClicks != null && totalImpr > 0 ? totalClicks / totalImpr : null;
+  const avgPos        = g && totalImpr > 0
     ? g.daily.reduce((s, r) => s + r.position * r.impressions, 0) / totalImpr : null;
-  const totalSignups = l ? Object.values(l.totals).reduce((s, v) => s + v, 0) : null;
-  const totTrialing  = l ? (l.totals.trialing || 0) : null;
-  const totActive    = l ? (l.totals.active || 0) : null;
-  const totNone      = l ? (l.totals.none || 0) : null;
-  return { totalClicks, totalImpr, avgCTR, avgPos, totalSignups, totTrialing, totActive, totNone };
+  const totalSignups  = l ? Object.values(l.totals).reduce((s, v) => s + v, 0) : null;
+  const totTrialing   = l ? (l.totals.trialing || 0) : null;
+  const totActive     = l ? (l.funnel?.ever_active ?? l.totals.active ?? 0) : null;
+  const totNotStarted = l ? (l.totals.not_started || 0) : null;
+  return { totalClicks, totalImpr, avgCTR, avgPos, totalSignups, totTrialing, totActive, totNotStarted };
 }
 
 function renderKPIs() {
@@ -593,8 +599,8 @@ function renderKPIs() {
     { label: 'Avg Position',     value: fmtPos(m.avgPos),       prev: c?.avgPos,         raw: m.avgPos,         sub: 'weighted by impressions',      cls: m.avgPos && m.avgPos < 10 ? 'green' : m.avgPos < 20 ? 'yellow' : '', reverse: true },
     { label: 'Organic Signups',  value: fmtN(m.totalSignups),   prev: c?.totalSignups,   raw: m.totalSignups,   sub: 'no utm_source or gclid',       cls: 'teal-c' },
     { label: 'Trialing',         value: fmtN(m.totTrialing),    prev: c?.totTrialing,    raw: m.totTrialing,    sub: 'currently in free trial',      cls: 'yellow' },
-    { label: 'Active',           value: fmtN(m.totActive),      prev: c?.totActive,      raw: m.totActive,      sub: 'converted to paid',            cls: 'green' },
-    { label: 'Not Started',      value: fmtN(m.totNone),        prev: c?.totNone,        raw: m.totNone,        sub: 'stuck in signup flow',         cls: '' },
+    { label: 'Active',           value: fmtN(m.totActive),      prev: c?.totActive,      raw: m.totActive,      sub: 'ever converted to paid',       cls: 'green' },
+    { label: 'Not Started',      value: fmtN(m.totNotStarted),  prev: c?.totNotStarted,  raw: m.totNotStarted,  sub: 'stuck in signup flow',         cls: '' },
   ].map(k => `<div class="kpi-card">
     <div class="kpi-label">${k.label}</div>
     <div class="kpi-value ${k.cls}">${k.value}${compareEnabled ? deltaHtml(k.raw, k.prev, k.reverse) : ''}</div>
@@ -714,12 +720,12 @@ function renderLeadsChart() {
   const datasets = [
     { label: 'Active',     data: weekly.map(w => w.active   || 0), backgroundColor: '#22c55ecc', stack: 's' },
     { label: 'Trialing',   data: weekly.map(w => w.trialing || 0), backgroundColor: '#f59e0bcc', stack: 's' },
-    { label: 'Not started',data: weekly.map(w => w.none     || 0), backgroundColor: '#475569cc', stack: 's' },
+    { label: 'Not started',data: weekly.map(w => w.not_started || 0), backgroundColor: '#475569cc', stack: 's' },
     { label: 'Canceled',   data: weekly.map(w => w.canceled || 0), backgroundColor: '#ef444460', stack: 's' },
   ];
   if (compareEnabled && compareState.leads?.weekly?.length) {
     const cw = compareState.leads.weekly;
-    const cTotal = cw.map(w => (w.active||0) + (w.trialing||0) + (w.none||0) + (w.canceled||0));
+    const cTotal = cw.map(w => (w.active||0) + (w.trialing||0) + (w.not_started||0) + (w.canceled||0));
     datasets.push({ label: 'Total (prev)', data: cTotal, type: 'line', borderColor: '#8b5cf660', borderDash: [5,4], backgroundColor: 'transparent', pointRadius: 2, borderWidth: 1.5, stack: false });
   }
 
@@ -736,6 +742,44 @@ function renderLeadsChart() {
       scales: {
         x: { stacked: true, ticks: { color: muted, maxRotation: 45, font: { size: 10 } }, grid: { color: border } },
         y: { stacked: true, ticks: { color: muted, font: { size: 10 } }, grid: { color: border } },
+      },
+    },
+  });
+}
+
+// ── Organic funnel cascade chart ──────────────────────────────────────────────
+function renderFunnelChart() {
+  const el = document.getElementById('funnelChart');
+  if (!state.leads?.funnel) { el.parentElement.innerHTML = '<p class="no-data">No funnel data</p>'; return; }
+
+  const f = state.leads.funnel;
+  const muted  = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+
+  const pct = (n, d) => d > 0 ? ` (${Math.round(n / d * 100)}%)` : '';
+  const labels = ['Signups', 'Trial started', 'Ever active', 'Canceled'];
+  const data   = [f.signups, f.trial, f.ever_active, f.canceled];
+  const colors = ['#14b8a6cc', '#f59e0bcc', '#22c55ecc', '#ef444460'];
+
+  if (funnelChart) funnelChart.destroy();
+  funnelChart = new Chart(el, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      ...chartOpts(),
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (item) => {
+            const conversions = ['', pct(f.trial, f.signups), pct(f.ever_active, f.trial), pct(f.canceled, f.signups)];
+            return ` ${item.parsed.x.toLocaleString()}${conversions[item.dataIndex]}`;
+          }
+        }},
+      },
+      scales: {
+        x: { ticks: { color: muted, font: { size: 10 } }, grid: { color: border } },
+        y: { ticks: { color: muted, font: { size: 11 } }, grid: { display: false } },
       },
     },
   });
