@@ -107,8 +107,8 @@ export async function onRequestGet({ request, env }) {
       for (const k of Object.keys(totals)) totals[k] += w[k] || 0;
     }
 
-    const [signups, trial, ever_active, canceled] = (cascadeRows[0] || [0, 0, 0, 0]).map(Number);
-    const funnel = { signups, trial, ever_active, canceled };
+    const [signups, trial, active, canceled] = (cascadeRows[0] || [0, 0, 0, 0]).map(Number);
+    const funnel = { signups, trial, active, canceled };
 
     return Response.json({ weekly, totals, funnel }, { headers: cors });
 

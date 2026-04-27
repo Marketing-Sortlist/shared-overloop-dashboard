@@ -577,7 +577,7 @@ function kpiMetrics(g, l) {
     ? g.daily.reduce((s, r) => s + r.position * r.impressions, 0) / totalImpr : null;
   const totalSignups  = l ? Object.values(l.totals).reduce((s, v) => s + v, 0) : null;
   const totTrialing   = l ? (l.totals.trialing || 0) : null;
-  const totActive     = l ? (l.funnel?.ever_active ?? l.totals.active ?? 0) : null;
+  const totActive     = l ? (l.funnel?.active ?? l.totals.active ?? 0) : null;
   const totNotStarted = l ? (l.totals.not_started || 0) : null;
   return { totalClicks, totalImpr, avgCTR, avgPos, totalSignups, totTrialing, totActive, totNotStarted };
 }
@@ -757,8 +757,8 @@ function renderFunnelChart() {
   const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
 
   const pct = (n, d) => d > 0 ? ` (${Math.round(n / d * 100)}%)` : '';
-  const labels = ['Signups', 'Trial started', 'Ever active', 'Canceled'];
-  const data   = [f.signups, f.trial, f.ever_active, f.canceled];
+  const labels = ['Signups', 'Trial started', 'Active', 'Canceled'];
+  const data   = [f.signups, f.trial, f.active, f.canceled];
   const colors = ['#14b8a6cc', '#f59e0bcc', '#22c55ecc', '#ef444460'];
 
   if (funnelChart) funnelChart.destroy();
@@ -772,7 +772,7 @@ function renderFunnelChart() {
         legend: { display: false },
         tooltip: { callbacks: {
           label: (item) => {
-            const conversions = ['', pct(f.trial, f.signups), pct(f.ever_active, f.trial), pct(f.canceled, f.signups)];
+            const conversions = ['', pct(f.trial, f.signups), pct(f.active, f.trial), pct(f.canceled, f.signups)];
             return ` ${item.parsed.x.toLocaleString()}${conversions[item.dataIndex]}`;
           }
         }},
