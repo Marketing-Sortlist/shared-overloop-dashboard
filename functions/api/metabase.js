@@ -549,7 +549,13 @@ export async function onRequest(context) {
             COUNT(*) FILTER (
               WHERE sc.updated_at IS NOT NULL
                 AND NOW() <= sc.updated_at + INTERVAL '14 days'
-            ) AS in_14d_window
+                AND (sub.status IS NULL OR sub.status != 'canceled')
+            ) AS in_14d_window,
+            COUNT(*) FILTER (
+              WHERE sc.updated_at IS NOT NULL
+                AND NOW() <= sc.updated_at + INTERVAL '14 days'
+                AND sub.status = 'canceled'
+            ) AS canceled_in_14d_window
           FROM companies
           JOIN LATERAL (
             SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
@@ -582,7 +588,7 @@ export async function onRequest(context) {
         `),
       ]);
       if (tbV2Rows[0]) {
-        const [avg_s2t, avg_t2a, over14, in14] = tbV2Rows[0];
+        const [avg_s2t, avg_t2a, over14, in14, canceled_in14] = tbV2Rows[0];
         const avg_signup_to_trial_by_source = {};
         for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
         trial_behavior_v2 = {
@@ -590,6 +596,7 @@ export async function onRequest(context) {
           avg_days_trial_to_active:  avg_t2a != null ? Number(avg_t2a) : null,
           over_14d_not_active:       Number(over14) || 0,
           in_14d_window:             Number(in14)   || 0,
+          canceled_in_14d_window:    Number(canceled_in14) || 0,
           avg_signup_to_trial_by_source,
         };
       }

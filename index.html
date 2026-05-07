@@ -809,8 +809,6 @@ function renderCostEvolution() {
   const actsMerged = mergeDailyMaps(mb.activations_daily, mb.activations_v2_daily);
   const trlsByD   = Object.fromEntries(trlsMerged.map(d => [d.date, d]));
   const actsByD   = Object.fromEntries(actsMerged.map(d => [d.date, d]));
-  const hasTrl    = trlsMerged.length > 0;
-  const hasAct    = actsMerged.length > 0;
 
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
@@ -820,38 +818,79 @@ function renderCostEvolution() {
   if (dates.length < 2) return;
 
   const labels = dates.map(d => currentGranularity === 'month' ? d.slice(0,7) : d.slice(5));
+
   const cSig = [], cTrl = [], cAct = [];
+  const nSig = [], nTrl = [], nAct = [];
+  const nSigMeta = [], nSigGoogle = [], nTrlMeta = [], nTrlGoogle = [], nActMeta = [], nActGoogle = [];
+
   for (const date of dates) {
     const spend   = (mByD[date]||0) + (gByD[date]||0);
     const sigs    = sigsByD[date] || {};
-    const paidSig = (sigs.meta||0) + (sigs.google||0);
-    const trl     = ((trlsByD[date]||{}).meta||0) + ((trlsByD[date]||{}).google||0);
-    const act     = ((actsByD[date]||{}).meta||0) + ((actsByD[date]||{}).google||0);
+    const mSig = sigs.meta||0, gSig = sigs.google||0;
+    const paidSig = mSig + gSig;
+    const mTrl = (trlsByD[date]||{}).meta||0, gTrl = (trlsByD[date]||{}).google||0;
+    const trl  = mTrl + gTrl;
+    const mAct = (actsByD[date]||{}).meta||0, gAct = (actsByD[date]||{}).google||0;
+    const act  = mAct + gAct;
+
     cSig.push(spend > 0 && paidSig > 0 ? Math.round(spend / paidSig * 100)/100 : null);
     cTrl.push(spend > 0 && trl > 0     ? Math.round(spend / trl     * 100)/100 : null);
     cAct.push(spend > 0 && act > 0     ? Math.round(spend / act     * 100)/100 : null);
+
+    nSig.push(paidSig); nSigMeta.push(mSig); nSigGoogle.push(gSig);
+    nTrl.push(trl);     nTrlMeta.push(mTrl); nTrlGoogle.push(gTrl);
+    nAct.push(act);     nActMeta.push(mAct); nActGoogle.push(gAct);
   }
 
   const datasets = [
-    { label: 'Cost/Signup',  data: cSig, borderColor: '#4f8ef7', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
-    { label: 'Cost/Trial',   data: cTrl, borderColor: '#f59e0b', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true },
-    { label: 'Cost/Active',  data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, hidden: true },
+    // Volume bars — right axis
+    { type: 'bar', label: '#Signups', data: nSig, metaData: nSigMeta, googleData: nSigGoogle,
+      backgroundColor: 'rgba(79,142,247,0.22)', borderColor: 'rgba(79,142,247,0.5)', borderWidth: 1,
+      yAxisID: 'y1', order: 2 },
+    { type: 'bar', label: '#Trials',  data: nTrl, metaData: nTrlMeta, googleData: nTrlGoogle,
+      backgroundColor: 'rgba(245,158,11,0.20)', borderColor: 'rgba(245,158,11,0.45)', borderWidth: 1,
+      yAxisID: 'y1', order: 2, hidden: true },
+    { type: 'bar', label: '#Active',  data: nAct, metaData: nActMeta, googleData: nActGoogle,
+      backgroundColor: 'rgba(34,197,94,0.18)',  borderColor: 'rgba(34,197,94,0.4)',  borderWidth: 1,
+      yAxisID: 'y1', order: 2, hidden: true },
+    // Cost lines — left axis
+    { type: 'line', label: 'Cost/Signup', data: cSig, borderColor: '#4f8ef7', backgroundColor: 'transparent',
+      fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, yAxisID: 'y', order: 1 },
+    { type: 'line', label: 'Cost/Trial',  data: cTrl, borderColor: '#f59e0b', backgroundColor: 'transparent',
+      fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, yAxisID: 'y', order: 1 },
+    { type: 'line', label: 'Cost/Active', data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent',
+      fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, yAxisID: 'y', order: 1, hidden: true },
   ];
 
   costEvolutionChart = new Chart(document.getElementById('costEvolutionChart'), {
-    type: 'line',
+    type: 'bar',
     data: { labels, datasets },
     options: { ...CHART_OPTS,
       interaction: { mode: 'index', intersect: false },
       plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
         label: (item) => {
+          if (item.dataset.yAxisID === 'y1') {
+            const i = item.dataIndex;
+            const m = item.dataset.metaData?.[i] ?? 0;
+            const g = item.dataset.googleData?.[i] ?? 0;
+            return ` ${item.dataset.label}: ${item.parsed.y}  (Meta: ${m} · Google: ${g})`;
+          }
           const v = item.parsed.y;
           return v != null ? ` ${item.dataset.label}: $${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
         }
       }}},
       scales: {
         x: { ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
-        y: { ticks: { color: '#7a8ba8', callback: v => '$'+v.toFixed(0), font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: {
+          type: 'linear', position: 'left',
+          ticks: { color: '#7a8ba8', callback: v => '$'+v.toFixed(0), font: { size: 10 } },
+          grid: { color: '#232d44' },
+        },
+        y1: {
+          type: 'linear', position: 'right',
+          ticks: { color: '#7a8ba8', font: { size: 10 } },
+          grid: { drawOnChartArea: false },
+        },
       }
     },
   });
@@ -1391,7 +1430,12 @@ function renderTrialBehaviorV2() {
     <div class="fin-card">
       <div class="fin-label">In 14d Window</div>
       <div class="fin-value yellow">${fmtN(tb.in_14d_window)}</div>
-      <div class="fin-sub">currently within 14-day trial window</div>
+      <div class="fin-sub">within 14-day trial window, not canceled</div>
+    </div>
+    <div class="fin-card" style="border-color:rgba(239,68,68,0.35)">
+      <div class="fin-label">Canceled before trial ends</div>
+      <div class="fin-value red">${fmtN(tb.canceled_in_14d_window ?? 0)}</div>
+      <div class="fin-sub">in 14d window &amp; already canceled</div>
     </div>
   </div>
   ${allSrcs.length ? `
