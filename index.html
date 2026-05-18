@@ -148,9 +148,10 @@
 
   /* Status badges */
   .status-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
-  .status-active   { background: #16532420; color: var(--green); }
-  .status-trialing { background: #78350f20; color: var(--yellow); }
-  .status-canceled { background: #7f202020; color: var(--red); }
+  .status-active          { background: #16532420; color: var(--green); }
+  .status-trialing        { background: #78350f20; color: var(--yellow); }
+  .status-canceled        { background: #7f202020; color: var(--red); }
+  .status-no_subscription { background: #1e293b; color: var(--muted); }
   .status-past_due { background: #7f202020; color: var(--red); }
 
   /* Filter pills */
@@ -383,13 +384,27 @@
   </div>
 
   <div class="section-card" style="overflow-x:auto">
-    <h3>Paying Customers</h3>
-    <div id="fin-paying"><div class="loading"><div class="spinner"></div></div></div>
+    <h3 class="collapsible-hdr" onclick="toggleSection('fin-paying','fin-paying-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+      Paying Customers
+      <span id="fin-paying-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+    <div id="fin-paying" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 
   <div class="section-card" style="overflow-x:auto">
-    <h3>Churn — subscription_status ≠ active, newest first</h3>
-    <div id="fin-churn"><div class="loading"><div class="spinner"></div></div></div>
+    <h3 class="collapsible-hdr" onclick="toggleSection('fin-churn','fin-churn-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+      Churn — subscription_status ≠ active, newest first
+      <span id="fin-churn-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+    <div id="fin-churn" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3 class="collapsible-hdr" onclick="toggleSection('fin-trials','fin-trials-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+      Current Trials — V2, ordered by trial end date
+      <span id="fin-trials-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+    <div id="fin-trials" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </main>
 </div>
@@ -408,10 +423,10 @@ let dp = { unit: 'week', mode: 'last_n', n: 6 };
 let activeSince = '', activeUntil = '';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function fmt$(n)  { if (!n) return '–'; return n >= 1000 ? '$'+(n/1000).toFixed(1)+'k' : '$'+parseFloat(n).toFixed(0); }
+function fmt$(n)  { if (!n) return '–'; return n >= 1000 ? '€'+(n/1000).toFixed(1)+'k' : '€'+parseFloat(n).toFixed(0); }
 function fmtN(n)  { return n != null ? parseInt(n).toLocaleString('en-US') : '–'; }
 function fmtPct(n){ return n != null ? parseFloat(n).toFixed(1)+'%' : '–'; }
-function fmtCur(n){ return n != null ? '$'+parseFloat(n).toFixed(2) : '–'; }
+function fmtCur(n){ return n != null ? '€'+parseFloat(n).toFixed(2) : '–'; }
 
 const CHART_OPTS = {
   responsive: true, maintainAspectRatio: false,
@@ -876,14 +891,14 @@ function renderCostEvolution() {
             return ` ${item.dataset.label}: ${item.parsed.y}  (Meta: ${m} · Google: ${g})`;
           }
           const v = item.parsed.y;
-          return v != null ? ` ${item.dataset.label}: $${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
+          return v != null ? ` ${item.dataset.label}: €${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
         }
       }}},
       scales: {
         x: { ticks: { color: '#7a8ba8', font: { size: 10 } }, grid: { color: '#232d44' } },
         y: {
           type: 'linear', position: 'left',
-          ticks: { color: '#7a8ba8', callback: v => '$'+v.toFixed(0), font: { size: 10 } },
+          ticks: { color: '#7a8ba8', callback: v => '€'+v.toFixed(0), font: { size: 10 } },
           grid: { color: '#232d44' },
         },
         y1: {
@@ -1073,7 +1088,7 @@ function renderSpendCharts() {
       }}},
       scales: {
         x: { stacked: true, ticks: { color: '#7a8ba8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#232d44' } },
-        y: { stacked: true, ticks: { color: '#7a8ba8', callback: v => '$'+v, font: { size: 10 } }, grid: { color: '#232d44' } },
+        y: { stacked: true, ticks: { color: '#7a8ba8', callback: v => '€'+v, font: { size: 10 } }, grid: { color: '#232d44' } },
       }
     },
   });
@@ -1810,22 +1825,22 @@ function renderFinancials() {
     : 'no churn data yet';
 
   const cards = [
-    { l: 'MRR',              v: fin.mrr ? '$'+fmtN(fin.mrr) : '–',
+    { l: 'MRR',              v: fin.mrr ? '€'+fmtN(fin.mrr) : '–',
       s: 'sum of active subscriptions (current)', c: 'teal-c' },
     { l: 'Active Paid',      v: fmtN(fin.active_paid),
       s: 'current self-service customers', c: 'green' },
-    { l: 'In 14d Window',    v: fmtN((mb.trial_behavior?.in_14d_window || 0) + (mb.trial_behavior_v2?.in_14d_window || 0)),
-      s: 'within 14-day trial window (Legacy + V2, selected period)', c: 'yellow' },
+    { l: 'In 14d Window',    v: fmtN(mb.trial_behavior_v2?.in_14d_window || 0),
+      s: 'within 14-day trial window, not canceled (V2, selected period)', c: 'yellow' },
     { l: 'Trial → Active',  v: fin.trial_to_active_rate != null ? fin.trial_to_active_rate + '%' : '–',
       s: 'active ÷ (active+trialing) — current',
       c: fin.trial_to_active_rate > 20 ? 'green' : 'yellow' },
-    { l: 'Canceled (trial)', v: mb.canceled_trial_stats ? fmtN(mb.canceled_trial_stats.canceled_trial) : '–',
-      s: mb.canceled_trial_stats ? `${mb.canceled_trial_stats.canceled_trial_rate}% of all who started trial — never paid` : 'all-time', c: mb.canceled_trial_stats?.canceled_trial > 0 ? 'red' : '' },
+    { l: 'Canceled before trial ends', v: fmtN(mb.trial_behavior_v2?.canceled_in_14d_window ?? 0),
+      s: 'in 14d window &amp; already canceled (V2, selected period)', c: mb.trial_behavior_v2?.canceled_in_14d_window > 0 ? 'red' : '', border: 'rgba(239,68,68,0.35)' },
     { l: 'Churn Rate',       v: fin.churn_rate != null ? fin.churn_rate + '%' : '–',
       s: 'churned ÷ (active+churned) — lifetime', c: fin.churn > 0 ? 'red' : '' },
     { l: 'ARPU',             v: arpu ? fmtCur(arpu) : '–',
       s: 'MRR ÷ active customers — monthly', c: '' },
-    { l: 'LTV (est.)',       v: ltv ? '$'+fmtN(ltv) : '–',
+    { l: 'LTV (est.)',       v: ltv ? '€'+fmtN(ltv) : '–',
       s: `ARPU × ${tenureNote}`, c: 'teal-c' },
     { l: 'LTV : CAC',        v: ltvCacRatio ? ltvCacRatio + 'x' : '–',
       s: 'LTV ÷ (period spend ÷ active) — target >3x',
@@ -1839,7 +1854,7 @@ function renderFinancials() {
   ];
 
   el.innerHTML = cards.map(c =>
-    `<div class="fin-card">
+    `<div class="fin-card"${c.border ? ` style="border-color:${c.border}"` : ''}>
       <div class="fin-label">${c.l}</div>
       <div class="fin-value ${c.c || ''}">${c.v}</div>
       <div class="fin-sub">${c.s}</div>
@@ -1860,7 +1875,7 @@ function renderFinancials() {
           <td style="color:var(--muted)">${c.email || '–'}</td>
           <td>${c.started_at || '–'}</td>
           <td>${c.plan || '–'}</td>
-          <td>$${(c.mrr||0).toFixed(0)}</td>
+          <td>€${(c.mrr||0).toFixed(0)}</td>
           <td>${c.seats ?? '–'}</td>
           <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
         </tr>`
@@ -1883,12 +1898,51 @@ function renderFinancials() {
           <td>${c.started_at || '–'}</td>
           <td><span class="status-badge status-${c.status}">${c.status}</span></td>
           <td>${c.plan || '–'}</td>
-          <td>${c.mrr ? '$'+(c.mrr).toFixed(0) : '–'}</td>
+          <td>${c.mrr ? '€'+(c.mrr).toFixed(0) : '–'}</td>
           <td><span style="color:var(--muted)">${c.source || '–'}</span></td>
         </tr>`
       ).join('')}</tbody>
     </table>`;
   }
+
+  // Current Trials table
+  const trialsEl = document.getElementById('fin-trials');
+  const trialsList = fin.trials_list || [];
+  const today = new Date().toISOString().slice(0, 10);
+  if (!trialsList.length) {
+    trialsEl.innerHTML = '<p class="no-data">No current trials found</p>';
+  } else {
+    trialsEl.innerHTML = `<table>
+      <thead><tr><th>Company</th><th>Email</th><th>Trial Start</th><th>Trial End</th><th>Days Left</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody>${trialsList.map(t => {
+        const daysLeft = t.trial_end_date
+          ? Math.ceil((new Date(t.trial_end_date) - new Date(today)) / 86400000)
+          : null;
+        const daysColor = daysLeft == null ? ''
+          : t.status === 'active' ? 'color:var(--green)'
+          : daysLeft <= 2 ? 'color:var(--red)'
+          : daysLeft <= 5 ? 'color:var(--yellow)'
+          : 'color:var(--green)';
+        return `<tr>
+          <td>${t.company || '–'}</td>
+          <td style="color:var(--muted)">${t.email || '–'}</td>
+          <td>${t.trial_started_at || '–'}</td>
+          <td>${t.trial_end_date || '–'}</td>
+          <td style="${daysColor};font-weight:600">${daysLeft != null ? daysLeft + 'd' : '–'}</td>
+          <td><span class="status-badge status-${t.status}">${t.status}</span></td>
+          <td><span style="color:var(--muted)">${srcLabel(t.source) || '–'}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+}
+
+function toggleSection(contentId, chevronId) {
+  const el = document.getElementById(contentId);
+  const ch = document.getElementById(chevronId);
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  ch.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
 }
 
 // Init default: previous week

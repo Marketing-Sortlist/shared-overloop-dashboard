@@ -81,6 +81,10 @@ const INTERNAL_FILTER = `
   AND companies.name NOT ILIKE '%overloop%'
 `;
 
+const V1_ONLY_FILTER = `
+  AND NOT EXISTS (SELECT 1 FROM onboarding_v2_sessions WHERE onboarding_v2_sessions.user_id = u.id)
+`;
+
 function buildPeriodMap(rows) {
   const map = {};
   for (const [period, source, cnt] of rows) {
@@ -138,6 +142,7 @@ export async function onRequest(context) {
         ) u ON true
         WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
         ${INTERNAL_FILTER}
+        ${V1_ONLY_FILTER}
       ),
       deduped AS (
         SELECT DISTINCT ON (email) email, source, step_num
@@ -191,6 +196,7 @@ export async function onRequest(context) {
           ) u ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
           ${INTERNAL_FILTER}
+          ${V1_ONLY_FILTER}
         ),
         deduped AS (
           SELECT DISTINCT ON (email) email, device, step_num
@@ -235,6 +241,7 @@ export async function onRequest(context) {
           ) u ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
           ${INTERNAL_FILTER}
+          ${V1_ONLY_FILTER}
         ),
         deduped AS (
           SELECT DISTINCT ON (period, email) period, email, source, step_num
@@ -373,6 +380,46 @@ export async function onRequest(context) {
     // 7. Card 670 — current trials
     const trialRows2 = await runCard(env, 670);
     const trialing   = trialRows2.length;
+
+    // 7c. Trials list — V2 only: all users who completed V2 onboarding (sc.state='completed').
+    // Shows current_subscription_status for each, and trial window = sc.updated_at + 14 days.
+    let trials_list = [];
+    try {
+      const trialsListRows = await runSQL(env, `
+        SELECT
+          companies.name AS company,
+          u.email,
+          sc.updated_at::date AS trial_started_at,
+          (sc.updated_at + INTERVAL '14 days')::date AS trial_end_date,
+          COALESCE(sub.status, 'no_subscription') AS status,
+          ${SOURCE_CASE} AS source
+        FROM companies
+        JOIN LATERAL (
+          SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
+        ) u ON true
+        JOIN LATERAL (
+          SELECT * FROM onboarding_v2_sessions
+          WHERE user_id = u.id AND state = 'completed'
+          ORDER BY updated_at DESC LIMIT 1
+        ) sc ON true
+        LEFT JOIN LATERAL (
+          SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
+        ) sub ON true
+        WHERE u.email NOT ILIKE '%sortlist.com%'
+          AND u.email NOT ILIKE '%overloop%'
+          AND companies.name NOT ILIKE '%sortlist%'
+          AND companies.name NOT ILIKE '%overloop%'
+        ORDER BY sc.updated_at ASC
+      `);
+      trials_list = trialsListRows.map(([company, email, trial_started_at, trial_end_date, status, source]) => ({
+        company,
+        email,
+        trial_started_at: trial_started_at ? String(trial_started_at).slice(0, 10) : null,
+        trial_end_date:   trial_end_date   ? String(trial_end_date).slice(0, 10)   : null,
+        status,
+        source,
+      }));
+    } catch (_) {}
 
     // 7b. Avg days signup → active
     let avg_days_signup_to_active = null;
@@ -698,6 +745,7 @@ export async function onRequest(context) {
           : 0,
         paying_customers: payingCustomers,
         churn_list:       churnList,
+        trials_list,
       },
     }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (err) {
