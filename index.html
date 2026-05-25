@@ -966,13 +966,16 @@ function renderCostByPeriod() {
   const gSpendByD = Object.fromEntries(gDaily.map(d => [d.date, d.spend || 0]));
 
   const sigsByD = Object.fromEntries((mb.signups_daily || []).map(d => [d.date, d]));
-  const trlsMrg = mergeDailyMaps(mb.trials_daily,      mb.trials_v2_daily);
-  const actsMrg = mergeDailyMaps(mb.activations_daily, mb.activations_v2_daily);
-  const trlsByD = Object.fromEntries(trlsMrg.map(d => [d.date, d]));
-  const actsByD = Object.fromEntries(actsMrg.map(d => [d.date, d]));
+  const trlsMrg  = mergeDailyMaps(mb.trials_daily,         mb.trials_v2_daily);
+  const actsMrg  = mergeDailyMaps(mb.activations_daily,    mb.activations_v2_daily);
+  const cansMrg  = mergeDailyMaps(mb.cancellations_daily,  mb.cancellations_v2_daily);
+  const trlsByD  = Object.fromEntries(trlsMrg.map(d => [d.date, d]));
+  const actsByD  = Object.fromEntries(actsMrg.map(d => [d.date, d]));
+  const cansByD  = Object.fromEntries(cansMrg.map(d => [d.date, d]));
 
   const hasTrl = trlsMrg.length > 0;
   const hasAct = actsMrg.length > 0;
+  const hasCan = cansMrg.length > 0;
 
   const allDates = new Set([
     ...(mb.signups_daily || []).map(d => d.date),
@@ -988,17 +991,19 @@ function renderCostByPeriod() {
   const byDate = {};
   for (const date of dates) {
     const mS = mSpendByD[date] || 0, gS = gSpendByD[date] || 0;
-    const sigs = sigsByD[date] || {}, trls = trlsByD[date] || {}, acts = actsByD[date] || {};
+    const sigs = sigsByD[date] || {}, trls = trlsByD[date] || {}, acts = actsByD[date] || {}, cans = cansByD[date] || {};
     // "Organic" = sum of all non-meta/google sources (youtube, trustpilot, organic, etc.)
-    const organicKeys = Object.keys(sigs).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
+    const organicKeys    = Object.keys(sigs).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
+    const organicCanKeys = Object.keys(cans).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
     const organicSig  = organicKeys.reduce((s, k) => s + (sigs[k]||0), 0);
     const organicTrl  = organicKeys.reduce((s, k) => s + (trls[k]||0), 0);
     const organicAct  = organicKeys.reduce((s, k) => s + (acts[k]||0), 0);
+    const organicCan  = organicCanKeys.reduce((s, k) => s + (cans[k]||0), 0);
     byDate[date] = {
-      combined: { spend: mS+gS, sig:(sigs.meta||0)+(sigs.google||0), trl:(trls.meta||0)+(trls.google||0), act:(acts.meta||0)+(acts.google||0) },
-      meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0   },
-      google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0 },
-      organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct     },
+      combined: { spend: mS+gS, sig:(sigs.meta||0)+(sigs.google||0), trl:(trls.meta||0)+(trls.google||0), act:(acts.meta||0)+(acts.google||0), can:(cans.meta||0)+(cans.google||0) },
+      meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0,   can: cans.meta||0   },
+      google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0, can: cans.google||0 },
+      organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct,     can: organicCan     },
     };
   }
 
@@ -1022,6 +1027,9 @@ function renderCostByPeriod() {
     ...(hasAct ? [
       { key: 'act', label: 'Activations',  paidOnly: false, fmt: (r) => fmtN(r.act) },
       { key: 'cpa', label: 'Cost/Active',  paidOnly: true,  fmt: (r) => r.spend > 0 && r.act > 0 ? fmtCur(r.spend/r.act) : dash },
+    ] : []),
+    ...(hasCan ? [
+      { key: 'can', label: 'Canceled',     paidOnly: false, fmt: (r) => fmtN(r.can) },
     ] : []),
   ];
 

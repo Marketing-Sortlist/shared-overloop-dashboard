@@ -551,6 +551,51 @@ export async function onRequest(context) {
       activations_v2_daily = Object.values(aMap).sort((x, y) => x.date.localeCompare(y.date));
     } catch (_) {}
 
+    // V1 + V2 per-period cancellations
+    let cancellations_daily = [], cancellations_v2_daily = [];
+    try {
+      const [canV1Rows, canV2Rows] = await Promise.all([
+        runSQL(env, `
+          SELECT
+            DATE_TRUNC('${granularity}', companies.created_at)::date AS period,
+            ${SOURCE_CASE} AS source,
+            COUNT(DISTINCT u.email) AS cnt
+          FROM companies
+          LEFT JOIN LATERAL (
+            SELECT * FROM subscriptions WHERE subscriptions.company_id = companies.id ORDER BY id DESC LIMIT 1
+          ) sub ON true
+          JOIN LATERAL (
+            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+            AND sub.status = 'canceled'
+            ${INTERNAL_FILTER}
+            ${V1_ONLY_FILTER}
+          GROUP BY 1, 2 ORDER BY 1
+        `),
+        runSQL(env, `
+          SELECT
+            DATE_TRUNC('${granularity}', companies.created_at)::date AS period,
+            ${SOURCE_CASE} AS source,
+            COUNT(DISTINCT u.email) AS cnt
+          FROM companies
+          JOIN LATERAL (
+            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          JOIN onboarding_v2_sessions s ON s.user_id = u.id
+          LEFT JOIN LATERAL (
+            SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
+          ) sub ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+            AND sub.status = 'canceled'
+            ${INTERNAL_FILTER}
+          GROUP BY 1, 2 ORDER BY 1
+        `),
+      ]);
+      cancellations_daily    = buildPeriodMap(canV1Rows);
+      cancellations_v2_daily = buildPeriodMap(canV2Rows);
+    } catch (_) {}
+
     // 8b. Canceled-during-trial stats (all-time, no date filter)
     let canceled_trial_stats = null;
     try {
@@ -723,6 +768,8 @@ export async function onRequest(context) {
       funnel_v2_by_device,
       trials_v2_daily,
       activations_v2_daily,
+      cancellations_daily,
+      cancellations_v2_daily,
       trial_behavior_v2,
       canceled_trial_stats,
       compare,
