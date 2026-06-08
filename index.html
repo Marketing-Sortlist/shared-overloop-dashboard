@@ -170,6 +170,17 @@
   @media (max-width: 900px) {
     .charts-row, .tables-row, .source-grid { grid-template-columns: 1fr; }
   }
+
+  /* Annotation modal */
+  .ann-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 900; align-items: center; justify-content: center; }
+  .ann-overlay.open { display: flex; }
+  .ann-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; width: 360px; max-width: 90vw; }
+  .ann-box h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .ann-date-label { font-size: 11px; color: var(--accent); margin-bottom: 14px; }
+  .ann-box textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; padding: 10px 12px; resize: vertical; min-height: 90px; font-family: inherit; line-height: 1.5; }
+  .ann-box textarea:focus { outline: none; border-color: var(--accent); }
+  .ann-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  .ann-hint { font-size: 10px; color: var(--muted); margin-top: 10px; text-align: center; }
 </style>
 </head>
 <body>
@@ -414,6 +425,7 @@
 let currentGranularity = 'week';
 let spendChart, donutChart, signupsChart, costEvolutionChart;
 let state = {};
+let annotationsData = {}; // { 'YYYY-MM-DD': { date, text, created_at } }
 let funnelFilter   = { type: null, value: null }; // type: 'source'|'device', value: key
 let funnelV2Filter = { type: null, value: null }; // type: 'source', value: key
 let activeFunnelTab = 'v2';
@@ -723,6 +735,7 @@ async function loadAll() {
     fetch(`${base}/api/google?${dr}`).then(r => r.json()),
     fetch(`${base}/api/metabase?${dr}&granularity=${currentGranularity}`).then(r => r.json()),
   ]);
+  loadAnnotations();
 
   const meta   = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
   const google = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
@@ -877,9 +890,62 @@ function renderCostEvolution() {
       fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, yAxisID: 'y', order: 1, hidden: true },
   ];
 
+  const annMarkerPlugin = {
+    id: 'annMarkers',
+    afterDraw(chart) {
+      const chartDates = chart._annotDates;
+      if (!chartDates || !Object.keys(annotationsData).length) return;
+      const { ctx, chartArea } = chart;
+      const xScale = chart.scales.x;
+      ctx.save();
+      for (let i = 0; i < chartDates.length; i++) {
+        if (!annotationsData[chartDates[i]]) continue;
+        const px = xScale.getPixelForValue(i);
+        ctx.strokeStyle = 'rgba(245,158,11,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(px, chartArea.top);
+        ctx.lineTo(px, chartArea.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f59e0b';
+        const cy = chartArea.bottom - 10;
+        ctx.beginPath();
+        ctx.moveTo(px, cy - 6);
+        ctx.lineTo(px + 5, cy);
+        ctx.lineTo(px, cy + 6);
+        ctx.lineTo(px - 5, cy);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    },
+    afterEvent(chart, args) {
+      const e = args.event;
+      if (e.type !== 'mousemove' && e.type !== 'click') return;
+      const ca = chart.chartArea;
+      const inZone = e.y >= ca.top && e.y <= ca.bottom && e.x >= ca.left && e.x <= ca.right;
+      if (e.type === 'mousemove') {
+        chart.canvas.style.cursor = inZone ? 'pointer' : 'default';
+      }
+      if (e.type === 'click' && inZone) {
+        const chartDates = chart._annotDates || [];
+        const xScale = chart.scales.x;
+        let nearestIdx = -1, nearestDist = Infinity;
+        for (let i = 0; i < chartDates.length; i++) {
+          const d = Math.abs(e.x - xScale.getPixelForValue(i));
+          if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+        }
+        if (nearestIdx >= 0 && nearestDist < 60) openAnnotationModal(chartDates[nearestIdx]);
+      }
+    },
+  };
+
   costEvolutionChart = new Chart(document.getElementById('costEvolutionChart'), {
     type: 'bar',
     data: { labels, datasets },
+    plugins: [annMarkerPlugin],
     options: { ...CHART_OPTS,
       interaction: { mode: 'index', intersect: false },
       plugins: { ...CHART_OPTS.plugins, tooltip: { callbacks: {
@@ -909,6 +975,7 @@ function renderCostEvolution() {
       }
     },
   });
+  costEvolutionChart._annotDates = dates;
 }
 
 function renderCostBySource() {
@@ -2023,6 +2090,58 @@ async function submitLogin(event) {
   }
 }
 
+// ── Annotations ────────────────────────────────────────────────────────────
+async function loadAnnotations() {
+  try {
+    const res = await fetch(`${window.location.origin}/api/annotations`);
+    const data = await res.json();
+    annotationsData = {};
+    for (const a of (data.annotations || [])) annotationsData[a.date] = a;
+    if (costEvolutionChart) renderCostEvolution();
+  } catch (_) {}
+}
+
+function openAnnotationModal(date) {
+  const existing = annotationsData[date];
+  document.getElementById('ann-date').textContent = date;
+  document.getElementById('ann-text').value = existing ? existing.text : '';
+  document.getElementById('ann-delete-btn').style.display = existing ? 'inline-flex' : 'none';
+  document.getElementById('ann-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('ann-text').focus(), 50);
+}
+
+function closeAnnotationModal() {
+  document.getElementById('ann-overlay').classList.remove('open');
+}
+
+async function saveAnnotation() {
+  const date = document.getElementById('ann-date').textContent;
+  const text = document.getElementById('ann-text').value.trim();
+  if (!text) return;
+  try {
+    const res = await fetch(`${window.location.origin}/api/annotations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, text }),
+    });
+    const data = await res.json();
+    if (data.ok) { annotationsData[date] = data.annotation; closeAnnotationModal(); renderCostEvolution(); }
+  } catch (_) {}
+}
+
+async function deleteAnnotation() {
+  const date = document.getElementById('ann-date').textContent;
+  try {
+    const res = await fetch(`${window.location.origin}/api/annotations`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date }),
+    });
+    const data = await res.json();
+    if (data.ok) { delete annotationsData[date]; closeAnnotationModal(); renderCostEvolution(); }
+  } catch (_) {}
+}
+
 // Auto-refresh at 6:00 AM local time every day (tab must be open)
 function scheduleAutoRefresh() {
   const now  = new Date();
@@ -2033,5 +2152,20 @@ function scheduleAutoRefresh() {
   setTimeout(() => { loadAll(); scheduleAutoRefresh(); }, ms);
 }
 </script>
+
+<!-- Annotation modal -->
+<div id="ann-overlay" class="ann-overlay" onclick="if(event.target===this)closeAnnotationModal()">
+  <div class="ann-box">
+    <h4>Annotation</h4>
+    <div class="ann-date-label" id="ann-date"></div>
+    <textarea id="ann-text" placeholder="What happened on this date? (campaign change, budget shift, external event…)"></textarea>
+    <div class="ann-actions">
+      <button class="btn" id="ann-delete-btn" style="display:none;color:var(--red);border-color:var(--red);margin-right:auto" onclick="deleteAnnotation()">Delete</button>
+      <button class="btn" onclick="closeAnnotationModal()">Cancel</button>
+      <button class="btn" style="background:var(--accent);border-color:var(--accent);color:#fff" onclick="saveAnnotation()">Save</button>
+    </div>
+    <div class="ann-hint">Click any date on the chart to add or edit an annotation</div>
+  </div>
+</div>
 </body>
 </html>
