@@ -1,3 +1,7 @@
 name = "overloop-dashboard"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "."
+
+[[kv_namespaces]]
+binding = "ANNOTATIONS"
+id = "a710883bff44406ea6263510217a6bfa"
