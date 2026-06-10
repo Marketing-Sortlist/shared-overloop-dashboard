@@ -52,6 +52,8 @@ const SOURCE_CASE = `
   END
 `;
 
+const CAMPAIGN_CASE = `LOWER(COALESCE(substring(companies.signup_url, 'utm_campaign=([^&]*)'), ''))`;
+
 const STEP_CASE = `
   CASE
     WHEN u.current_signup_step = 'finished'
@@ -125,6 +127,67 @@ export async function onRequest(context) {
       ORDER BY 1
     `);
     const signups_daily = buildPeriodMap(dailyRows);
+
+    // 1b. Signups grouped by source + utm_campaign (for per-campaign tables)
+    let signups_by_campaign = [];
+    try {
+      const sigCampRows = await runSQL(env, `
+        SELECT
+          ${SOURCE_CASE} AS source,
+          ${CAMPAIGN_CASE} AS campaign,
+          COUNT(DISTINCT u.email) AS cnt
+        FROM companies
+        JOIN LATERAL (
+          SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+        ) u ON true
+        WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+        ${INTERNAL_FILTER}
+        GROUP BY 1, 2
+        ORDER BY 1, 2
+      `);
+      signups_by_campaign = sigCampRows.map(([source, campaign, cnt]) => ({
+        source,
+        campaign,
+        signups: parseInt(cnt) || 0,
+      }));
+    } catch (_) {}
+
+    // 1c. Trials by source + utm_campaign — V1 only (V2 part merged after V2_BASE/V2_STEP are defined)
+    const tCampMap = {};
+    try {
+      const tv1Rows = await runSQL(env, `
+        WITH raw AS (
+          SELECT
+            u.email,
+            ${SOURCE_CASE} AS source,
+            ${CAMPAIGN_CASE} AS campaign,
+            ${STEP_CASE} AS step_num
+          FROM companies
+          LEFT JOIN LATERAL (
+            SELECT * FROM subscriptions WHERE subscriptions.company_id = companies.id ORDER BY id DESC LIMIT 1
+          ) sub ON true
+          JOIN LATERAL (
+            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          ${INTERNAL_FILTER}
+          ${V1_ONLY_FILTER}
+        ),
+        deduped AS (
+          SELECT DISTINCT ON (email) email, source, campaign, step_num
+          FROM raw ORDER BY email, step_num DESC
+        )
+        SELECT source, campaign, COUNT(*) FILTER (WHERE step_num >= 8) AS trials
+        FROM deduped
+        GROUP BY source, campaign
+        ORDER BY source, campaign
+      `);
+      for (const [source, campaign, t] of tv1Rows) {
+        const key = `${source}|${campaign}`;
+        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0 };
+        tCampMap[key].trials += parseInt(t) || 0;
+      }
+    } catch (_) {}
 
     // 2. Funnel
     const funnelRows = await runSQL(env, `
@@ -551,6 +614,28 @@ export async function onRequest(context) {
       activations_v2_daily = Object.values(aMap).sort((x, y) => x.date.localeCompare(y.date));
     } catch (_) {}
 
+    // 1c (V2 part). Trials by source + utm_campaign — V2 (merged into tCampMap from 1c)
+    try {
+      const tv2Rows = await runSQL(env, `
+        WITH raw AS (
+          SELECT
+            u.email,
+            ${SOURCE_CASE} AS source,
+            ${CAMPAIGN_CASE} AS campaign,
+            MAX(${V2_STEP}) AS step_num
+          ${V2_BASE} GROUP BY u.email, source, campaign
+        )
+        SELECT source, campaign, COUNT(*) FILTER (WHERE step_num >= 8) AS trials
+        FROM raw GROUP BY source, campaign ORDER BY source, campaign
+      `);
+      for (const [source, campaign, t] of tv2Rows) {
+        const key = `${source}|${campaign}`;
+        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0 };
+        tCampMap[key].trials += parseInt(t) || 0;
+      }
+    } catch (_) {}
+    const trials_by_campaign = Object.values(tCampMap);
+
     // V1 + V2 per-period cancellations
     let cancellations_daily = [], cancellations_v2_daily = [];
     try {
@@ -755,6 +840,8 @@ export async function onRequest(context) {
     return Response.json({
       granularity,
       signups_daily,
+      signups_by_campaign,
+      trials_by_campaign,
       trials_daily,
       activations_daily,
       funnel: {

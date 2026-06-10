@@ -440,6 +440,30 @@ function fmtN(n)  { return n != null ? parseInt(n).toLocaleString('en-US') : '�
 function fmtPct(n){ return n != null ? parseFloat(n).toFixed(1)+'%' : '–'; }
 function fmtCur(n){ return n != null ? '€'+parseFloat(n).toFixed(2) : '–'; }
 
+// ── Campaign → utm_campaign mapping ────────────────────────────────────────
+// Maps ad-platform campaign names to Metabase utm_campaign values.
+// Meta: match by exact utm key or prefix function.
+const META_CAMPAIGN_MAP = [
+  { name: 'Socialsky / Lead / Overloop Signup / ESES',       utm: 'conversion_try_now-eses' },
+  { name: 'Socialsky / Lead / Overloop Signup / BEFR + FRFR',utm: 'conversion_try_now-befr' },
+  { name: 'Socialsky / Lead / Overloop Signup / UK',         utm: 'conversion_try_now-uken' },
+  { name: 'Lead / Overloop Signup / EU-EN',                  utm: 'conversion_try_now-ueen' },
+  // Remarketing: utm starts with 'rtg_try_now' (language suffix varies)
+  { name: 'Socialsky / Remarketing / Overloop Signup',       matchFn: u => u.startsWith('rtg_try_now') },
+];
+
+// Google: normalize campaign name to lowercase with spaces/hyphens → underscores, compare to utm_campaign.
+function normalizeGoogleCampaign(name) {
+  return name.toLowerCase().replace(/[\s\-–|]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+// Aggregate signups or trials from Metabase by-campaign rows for a given source + matcher function.
+function sumCampaignMetric(rows, source, matchFn, field) {
+  return (rows || [])
+    .filter(r => r.source === source && matchFn(r.campaign || ''))
+    .reduce((s, r) => s + (r[field] || 0), 0);
+}
+
 const CHART_OPTS = {
   responsive: true, maintainAspectRatio: false,
   plugins: { legend: { labels: { color: '#7a8ba8', font: { size: 11 } } } },
@@ -1261,21 +1285,63 @@ function renderSignupsChart() {
 }
 
 function renderTables() {
-  const { meta, google } = state;
+  const { meta, google, mb } = state;
+  const sigsByCamp  = mb ? (mb.signups_by_campaign  || []) : [];
+  const trlsByCamp  = mb ? (mb.trials_by_campaign   || []) : [];
 
+  // ── Meta table ──
   const mEl = document.getElementById('meta-table');
-  mEl.innerHTML = !meta ? '<p class="no-data">No data</p>' :
-    `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Leads</th><th>CPL</th><th>CTR</th></tr></thead>
-    <tbody>${(meta.campaigns || []).map(c =>
-      `<tr><td>${c.name}</td><td>${fmt$(c.spend)}</td><td>${fmtN(c.leads)}</td><td>${fmtCur(c.cpl)}</td><td>${fmtPct(c.ctr)}</td></tr>`
-    ).join('')}</tbody></table>`;
+  if (!meta) {
+    mEl.innerHTML = '<p class="no-data">No data</p>';
+  } else {
+    const rows = (meta.campaigns || []).filter(c => c.spend > 0).map(c => {
+      const entry = META_CAMPAIGN_MAP.find(m => m.name === c.name);
+      const matchFn = entry
+        ? (entry.matchFn || (u => u === entry.utm))
+        : (u => false);
+      const sigs = sumCampaignMetric(sigsByCamp, 'meta', matchFn, 'signups');
+      const trls = sumCampaignMetric(trlsByCamp, 'meta', matchFn, 'trials');
+      const cac  = sigs > 0 ? c.spend / sigs : null;
+      const cpl  = trls > 0 ? c.spend / trls : null;
+      return `<tr>
+        <td>${c.name}</td>
+        <td>${fmt$(c.spend)}</td>
+        <td>${fmtN(sigs || null)}</td>
+        <td>${cac != null ? fmtCur(cac) : '—'}</td>
+        <td>${fmtN(trls || null)}</td>
+        <td>${cpl != null ? fmtCur(cpl) : '—'}</td>
+      </tr>`;
+    });
+    mEl.innerHTML = `<table><thead><tr>
+      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
+    </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  }
 
+  // ── Google table ──
   const gEl = document.getElementById('google-table');
-  gEl.innerHTML = !google ? '<p class="no-data">No data</p>' :
-    `<table><thead><tr><th>Campaign</th><th>Spend</th><th>Conv.</th><th>CPA</th><th>Clicks</th></tr></thead>
-    <tbody>${(google.campaigns || []).map(c =>
-      `<tr><td>${c.name}</td><td>${fmt$(c.spend)}</td><td>${parseFloat(c.conversions||0).toFixed(1)}</td><td>${fmtCur(c.cpa)}</td><td>${fmtN(c.clicks)}</td></tr>`
-    ).join('')}</tbody></table>`;
+  if (!google) {
+    gEl.innerHTML = '<p class="no-data">No data</p>';
+  } else {
+    const rows = (google.campaigns || []).filter(c => c.spend > 0).map(c => {
+      const normName = normalizeGoogleCampaign(c.name);
+      const matchFn  = u => u === normName;
+      const sigs = sumCampaignMetric(sigsByCamp, 'google', matchFn, 'signups');
+      const trls = sumCampaignMetric(trlsByCamp, 'google', matchFn, 'trials');
+      const cac  = sigs > 0 ? c.spend / sigs : null;
+      const cpl  = trls > 0 ? c.spend / trls : null;
+      return `<tr>
+        <td>${c.name}</td>
+        <td>${fmt$(c.spend)}</td>
+        <td>${fmtN(sigs || null)}</td>
+        <td>${cac != null ? fmtCur(cac) : '—'}</td>
+        <td>${fmtN(trls || null)}</td>
+        <td>${cpl != null ? fmtCur(cpl) : '—'}</td>
+      </tr>`;
+    });
+    gEl.innerHTML = `<table><thead><tr>
+      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
+    </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  }
 }
 
 // ══ FUNNEL SUB-TABS ═══════════════════════════════════════════════════════
