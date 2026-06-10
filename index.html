@@ -452,10 +452,18 @@ const META_CAMPAIGN_MAP = [
   { name: 'Socialsky / Remarketing / Overloop Signup',       matchFn: u => u.startsWith('rtg_try_now') },
 ];
 
-// Google: normalize campaign name to lowercase with spaces/hyphens → underscores, compare to utm_campaign.
-function normalizeGoogleCampaign(name) {
-  return name.toLowerCase().replace(/[\s\-–|]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-}
+// Google: explicit campaign name → utm_campaign mapping.
+const GOOGLE_CAMPAIGN_MAP = [
+  { name: '[SE-UK/IE-EN] - Overloop - Brand', utm: 'uk_brand'       },
+  { name: '[SE-UK/IE-EN] - Lead Acquisition', utm: 'uk_cold'        },
+  { name: '[SE-UK/IE-EN] - Competitors',      utm: 'uk_competitors' },
+  { name: '[SE-ES-ES] - Overloop - Brand',    utm: 'es_brand'       },
+  { name: '[SE-ES-ES] - Lead Acquisition',    utm: 'es_cold'        },
+  { name: '[SE-ES-ES] - Competitors',         utm: 'es_competitors' },
+  { name: '[SE-FR/BE-FR] - Overloop - Brand', utm: 'fr_brand'       },
+  { name: '[SE-FR/BE-FR] - Lead Acquisition', utm: 'fr_cold'        },
+  { name: '[SE-FR/BE-FR] - Competitors',      utm: 'fr_competitors' },
+];
 
 // Aggregate signups or trials from Metabase by-campaign rows for a given source + matcher function.
 function sumCampaignMetric(rows, source, matchFn, field) {
@@ -1323,8 +1331,8 @@ function renderTables() {
     gEl.innerHTML = '<p class="no-data">No data</p>';
   } else {
     const rows = (google.campaigns || []).filter(c => c.spend > 0).map(c => {
-      const normName = normalizeGoogleCampaign(c.name);
-      const matchFn  = u => u === normName;
+      const entry   = GOOGLE_CAMPAIGN_MAP.find(m => m.name === c.name);
+      const matchFn = entry ? (u => u === entry.utm) : (() => false);
       const sigs = sumCampaignMetric(sigsByCamp, 'google', matchFn, 'signups');
       const trls = sumCampaignMetric(trlsByCamp, 'google', matchFn, 'trials');
       const cac  = sigs > 0 ? c.spend / sigs : null;
