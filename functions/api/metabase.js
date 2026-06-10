@@ -615,18 +615,25 @@ export async function onRequest(context) {
     } catch (_) {}
 
     // 1c (V2 part). Trials by source + utm_campaign — V2 (merged into tCampMap from 1c)
+    // Use positional GROUP BY (1,2,3) to avoid PostgreSQL alias-expansion issues
+    // when two aliases both reference companies.signup_url.
     try {
       const tv2Rows = await runSQL(env, `
-        WITH raw AS (
+        WITH base AS (
           SELECT
-            u.email,
-            ${SOURCE_CASE} AS source,
-            ${CAMPAIGN_CASE} AS campaign,
-            MAX(${V2_STEP}) AS step_num
-          ${V2_BASE} GROUP BY u.email, source, campaign
+            u.email                                                       AS email,
+            ${SOURCE_CASE}                                                AS source,
+            ${CAMPAIGN_CASE}                                              AS campaign,
+            ${V2_STEP}                                                    AS step_val
+          ${V2_BASE}
+        ),
+        raw AS (
+          SELECT email, source, campaign, MAX(step_val) AS step_num
+          FROM base
+          GROUP BY 1, 2, 3
         )
         SELECT source, campaign, COUNT(*) FILTER (WHERE step_num >= 8) AS trials
-        FROM raw GROUP BY source, campaign ORDER BY source, campaign
+        FROM raw GROUP BY 1, 2 ORDER BY 1, 2
       `);
       for (const [source, campaign, t] of tv2Rows) {
         const key = `${source}|${campaign}`;
