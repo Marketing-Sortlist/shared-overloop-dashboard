@@ -267,15 +267,16 @@
     <div id="cost-by-source"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 
-  <div class="charts-row">
+  <div class="section-card" style="padding:10px 16px">
+    <h3 class="collapsible-hdr" onclick="toggleSection('spend-charts-row','spend-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px;margin:0">
+      Ad Spend — Meta + Google Ads
+      <span id="spend-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+  </div>
+  <div id="spend-charts-row" class="charts-row" style="display:none">
     <div class="chart-card">
-      <h3 class="collapsible-hdr" onclick="toggleSection('spend-chart-wrap','spend-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
-        Ad Spend — Meta + Google Ads
-        <span id="spend-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
-      </h3>
-      <div id="spend-chart-wrap" style="display:none">
-        <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
-      </div>
+      <h3>Ad Spend — Meta + Google Ads</h3>
+      <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Channel Split — Ad Spend Share</h3>
