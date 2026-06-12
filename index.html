@@ -269,8 +269,13 @@
 
   <div class="charts-row">
     <div class="chart-card">
-      <h3>Ad Spend — Meta + Google Ads</h3>
-      <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
+      <h3 class="collapsible-hdr" onclick="toggleSection('spend-chart-wrap','spend-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Ad Spend — Meta + Google Ads
+        <span id="spend-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="spend-chart-wrap" style="display:none">
+        <div class="chart-wrap"><canvas id="spendChart"></canvas></div>
+      </div>
     </div>
     <div class="chart-card">
       <h3>Channel Split — Ad Spend Share</h3>
@@ -279,11 +284,22 @@
   </div>
 
   <div class="section-card">
-    <h3>Signups per Period — by Source</h3>
-    <div class="chart-wrap-sm"><canvas id="signupsChart"></canvas></div>
+    <h3 class="collapsible-hdr" onclick="toggleSection('signups-chart-wrap','signups-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+      Signups per Period — by Source
+      <span id="signups-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+    <div id="signups-chart-wrap" style="display:none">
+      <div class="chart-wrap-sm"><canvas id="signupsChart"></canvas></div>
+    </div>
   </div>
 
-  <div class="tables-row">
+  <div class="section-card" style="padding:10px 16px">
+    <h3 class="collapsible-hdr" onclick="toggleSection('campaigns-tables-row','campaigns-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px;margin:0">
+      Campaigns — Meta &amp; Google Ads
+      <span id="campaigns-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+  </div>
+  <div id="campaigns-tables-row" class="tables-row" style="display:none">
     <div class="table-card">
       <h3><span class="badge badge-meta">META</span> Campaigns</h3>
       <div id="meta-table"><div class="loading"><div class="spinner"></div></div></div>
