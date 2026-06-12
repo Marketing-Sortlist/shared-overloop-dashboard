@@ -171,6 +171,28 @@
     .charts-row, .tables-row, .source-grid { grid-template-columns: 1fr; }
   }
 
+  /* Localisation tab */
+  .lang-bar-wrap { display:flex; align-items:center; gap:6px; }
+  .lang-bar-track { flex:1; height:6px; background:var(--border); border-radius:3px; min-width:60px; }
+  .lang-bar-fill  { height:6px; border-radius:3px; }
+  .lang-chart-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .lang-chart-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .lang-chart-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:12px; }
+  .lang-chart-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; }
+  .lang-chart-label { width:62px; color:var(--muted); text-align:right; flex-shrink:0; font-size:11px; }
+  .lang-chart-bar-track { flex:1; height:10px; background:var(--border); border-radius:4px; }
+  .lang-chart-bar-fill { height:10px; border-radius:4px; }
+  .lang-chart-val { width:38px; text-align:right; font-weight:600; font-size:11px; flex-shrink:0; }
+  .lang-pill { padding:4px 12px; border-radius:20px; border:1px solid var(--border); background:none; color:var(--muted); cursor:pointer; font-size:12px; transition:all .15s; }
+  .lang-pill.active { background:var(--teal); border-color:var(--teal); color:#000; font-weight:600; }
+  .lang-pill:hover:not(.active) { color:var(--text); }
+  .cohort-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+  .cohort-tbl td, .cohort-tbl th { padding:6px 12px; text-align:center; border:1px solid var(--border); }
+  .cohort-tbl th { background:var(--surface); font-weight:600; font-size:11px; }
+  .cohort-tbl td:first-child { text-align:left; font-weight:600; white-space:nowrap; }
+  .data-note { font-size:11px; color:var(--muted); margin-bottom:14px; padding:7px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; }
+  @media (max-width:900px) { .lang-chart-grid { grid-template-columns:1fr; } }
+
   /* Annotation modal */
   .ann-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 900; align-items: center; justify-content: center; }
   .ann-overlay.open { display: flex; }
@@ -235,6 +257,7 @@
   <button class="active" onclick="switchTab('performance')">Performance</button>
   <button onclick="switchTab('funnel')">Onboarding</button>
   <button onclick="switchTab('financials')">Financials</button>
+  <button onclick="switchTab('localisation')">Localisation</button>
   <a href="/organic.html" style="margin-left:auto; padding:11px 18px; color:var(--organic); font-size:13px; font-weight:500; text-decoration:none; display:flex; align-items:center; gap:5px; border-bottom:2px solid transparent; transition:all .15s;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     Organic SEO
@@ -443,6 +466,41 @@
       <span id="fin-trials-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
     </h3>
     <div id="fin-trials" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</main>
+</div>
+
+<div id="tab-localisation" class="tab-panel">
+<main>
+  <p class="tab-goal"><strong>Goal:</strong> Understand how user behaviour varies by language — identify where each language drops off in the funnel and which languages have higher churn after activation.</p>
+  <p class="data-note">All-time data &nbsp;·&nbsp; Signups up to 14 days ago (recent cohorts excluded — they haven't had enough time to complete the trial cycle) &nbsp;·&nbsp; Language = account owner's preferred locale set in Overloop</p>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Funnel by Language</h3>
+    <div id="lang-summary"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card">
+    <h3>Conversion Rates — Visual Comparison</h3>
+    <div id="lang-charts"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section-card" style="overflow-x:auto">
+    <h3>Cohort Analysis</h3>
+    <div style="display:flex;gap:20px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Granularity</span>
+        <button class="lang-pill active" id="cohort-gran-quarter" onclick="setCohortGranularity('quarter',this)">Quarter</button>
+        <button class="lang-pill" id="cohort-gran-month" onclick="setCohortGranularity('month',this)">Month</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Metric</span>
+        <button class="lang-pill active" id="cohort-met-trial_rate" onclick="setCohortMetric('trial_rate',this)">Trial %</button>
+        <button class="lang-pill" id="cohort-met-activation_rate" onclick="setCohortMetric('activation_rate',this)">Active / Trial</button>
+        <button class="lang-pill" id="cohort-met-churn_rate" onclick="setCohortMetric('churn_rate',this)">% Churn</button>
+      </div>
+    </div>
+    <div id="lang-cohort"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </main>
 </div>
@@ -781,6 +839,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelector(`.tab-bar button[onclick="switchTab('${name}')"]`).classList.add('active');
+  if (name === 'localisation') loadLocalisation();
 }
 
 // ── Main fetch ─────────────────────────────────────────────────────────────
@@ -2142,6 +2201,202 @@ function toggleSection(contentId, chevronId) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : '';
   ch.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
+// ══ LOCALISATION ═════════════════════════════════════════════════════════════
+
+let localisationLoaded = false;
+let cohortGranularity  = 'quarter';
+let cohortMetric       = 'trial_rate';
+
+const LANG_LABEL = { en:'English', fr:'French', es:'Spanish', de:'German', nl:'Dutch', it:'Italian' };
+
+async function loadLocalisation() {
+  if (localisationLoaded) return;
+  try {
+    const r = await fetch(`${window.location.origin}/api/localisation`).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    state.localisation = r;
+    localisationLoaded = true;
+    renderLocalisationSummary();
+    renderLocalisationCharts();
+    renderCohortHeatmap();
+  } catch(e) {
+    document.getElementById('lang-summary').innerHTML = `<p class="no-data">Error loading data: ${e.message}</p>`;
+    document.getElementById('lang-charts').innerHTML  = '';
+    document.getElementById('lang-cohort').innerHTML  = '';
+  }
+}
+
+function setCohortGranularity(g, btn) {
+  cohortGranularity = g;
+  document.querySelectorAll('[id^="cohort-gran-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCohortHeatmap();
+}
+
+function setCohortMetric(m, btn) {
+  cohortMetric = m;
+  document.querySelectorAll('[id^="cohort-met-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCohortHeatmap();
+}
+
+function renderLocalisationSummary() {
+  const el   = document.getElementById('lang-summary');
+  const rows = state.localisation?.funnel_by_language || [];
+  if (!rows.length) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const pct    = (n, d) => d > 0 ? n / d : 0;
+  const fmtN   = n => n.toLocaleString();
+  const maxTrl = Math.max(...rows.map(r => pct(r.trials, r.signups)));
+  const maxAct = Math.max(...rows.map(r => pct(r.active, r.trials)));
+  const maxChr = Math.max(...rows.map(r => pct(r.cancel_active, r.active)));
+  const dash   = `<span style="color:var(--muted)">–</span>`;
+
+  const bar = (val, max, color) => {
+    const w = max > 0 ? Math.round(val / max * 100) : 0;
+    return `<div class="lang-bar-wrap">
+      <div class="lang-bar-track"><div class="lang-bar-fill" style="width:${w}%;background:${color}"></div></div>
+      <span style="font-size:11px;min-width:38px">${Math.round(val * 100)}%</span>
+    </div>`;
+  };
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Language</th>
+      <th style="text-align:right">Signups</th>
+      <th style="text-align:right">Trials</th>
+      <th style="min-width:120px">Trial %</th>
+      <th style="text-align:right">Active</th>
+      <th style="min-width:120px">Active / Trial</th>
+      <th style="text-align:right">Cancel (active)</th>
+      <th style="min-width:120px">% Churn</th>
+    </tr></thead>
+    <tbody>${rows.map(r => {
+      const trlRate = pct(r.trials, r.signups);
+      const actRate = pct(r.active, r.trials);
+      const chrRate = pct(r.cancel_active, r.active);
+      return `<tr>
+        <td style="font-weight:600">${LANG_LABEL[r.lang] || r.lang}</td>
+        <td style="text-align:right">${fmtN(r.signups)}</td>
+        <td style="text-align:right">${fmtN(r.trials)}</td>
+        <td>${bar(trlRate, maxTrl, 'var(--teal)')}</td>
+        <td style="text-align:right">${fmtN(r.active)}</td>
+        <td>${bar(actRate, maxAct, '#22c55e')}</td>
+        <td style="text-align:right">${r.cancel_active || dash}</td>
+        <td>${r.active > 0 ? bar(chrRate, maxChr, '#ef4444') : dash}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function renderLocalisationCharts() {
+  const el   = document.getElementById('lang-charts');
+  const rows = state.localisation?.funnel_by_language || [];
+  if (!rows.length) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const SMALL_N = 15;
+  const charts = [
+    { title: 'Trial Rate',       color: 'var(--teal)', fn: r => r.signups > 0 ? r.trials / r.signups : 0 },
+    { title: 'Activation Rate',  color: '#22c55e',     fn: r => r.trials  > 0 ? r.active / r.trials  : 0 },
+    { title: 'Churn Rate',       color: '#ef4444',     fn: r => r.active  > 0 ? r.cancel_active / r.active : 0 },
+  ];
+
+  el.innerHTML = `<div class="lang-chart-grid">${charts.map(c => {
+    const sorted = [...rows]
+      .map(r => ({ label: LANG_LABEL[r.lang] || r.lang, val: c.fn(r), n: r.signups }))
+      .sort((a, b) => b.val - a.val);
+    const max = sorted[0]?.val || 1;
+    const hasSmall = sorted.some(r => r.n < SMALL_N);
+    return `<div class="lang-chart-card">
+      <div class="lang-chart-title">${c.title}</div>
+      ${sorted.map(r => {
+        const w     = Math.round(r.val / max * 100);
+        const small = r.n < SMALL_N;
+        return `<div class="lang-chart-row">
+          <span class="lang-chart-label" title="${r.n} signups">${r.label}</span>
+          <div class="lang-chart-bar-track">
+            <div class="lang-chart-bar-fill" style="width:${w}%;background:${c.color};opacity:${small ? 0.4 : 1}"></div>
+          </div>
+          <span class="lang-chart-val" style="opacity:${small ? 0.5 : 1}">${Math.round(r.val * 100)}%${small ? ' ⚠' : ''}</span>
+        </div>`;
+      }).join('')}
+      ${hasSmall ? `<div style="font-size:10px;color:var(--muted);margin-top:6px">⚠ n &lt; ${SMALL_N} signups — low confidence</div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderCohortHeatmap() {
+  const el   = document.getElementById('lang-cohort');
+  const data = state.localisation?.cohort_by_language || [];
+  if (!el || !data.length) return;
+
+  const getKey = (month) => {
+    if (cohortGranularity === 'month') return month;
+    const [y, m] = month.split('-').map(Number);
+    return `${y}-Q${Math.ceil(m / 3)}`;
+  };
+
+  const agg = {};
+  for (const row of data) {
+    const key  = getKey(row.month);
+    const lang = row.lang;
+    if (!agg[key])       agg[key] = {};
+    if (!agg[key][lang]) agg[key][lang] = { signups:0, trials:0, active:0, cancel_active:0 };
+    const c = agg[key][lang];
+    c.signups       += row.signups;
+    c.trials        += row.trials;
+    c.active        += row.active;
+    c.cancel_active += row.cancel_active;
+  }
+
+  const periods = Object.keys(agg).sort().reverse();
+  const langs   = ['en','fr','es','de','nl','it'].filter(l => data.some(r => r.lang === l));
+  const MIN_N   = 10;
+
+  const getVal = (cell) => {
+    if (!cell || cell.signups < MIN_N) return null;
+    if (cohortMetric === 'trial_rate')      return cell.trials > 0 ? cell.trials / cell.signups : 0;
+    if (cohortMetric === 'activation_rate') return cell.trials > 0 ? cell.active / cell.trials  : 0;
+    if (cohortMetric === 'churn_rate')      return cell.active > 0 ? cell.cancel_active / cell.active : 0;
+    return null;
+  };
+
+  const allVals = periods.flatMap(p => langs.map(l => getVal(agg[p]?.[l]))).filter(v => v != null);
+  const minV = allVals.length ? Math.min(...allVals) : 0;
+  const maxV = allVals.length ? Math.max(...allVals) : 1;
+
+  const heatBg = (val) => {
+    if (val == null || maxV === minV) return '';
+    const ratio    = (val - minV) / (maxV - minV);
+    const goodHigh = cohortMetric !== 'churn_rate';
+    const g        = goodHigh ? ratio : 1 - ratio;
+    const r        = Math.round(g < 0.5 ? 220 : 220 - (g - 0.5) * 2 * 170);
+    const gr       = Math.round(g < 0.5 ? 50 + g * 2 * 130 : 180);
+    return `rgba(${r},${gr},50,0.28)`;
+  };
+
+  const metricLabel = { trial_rate:'Trial %', activation_rate:'Active / Trial', churn_rate:'% Churn' }[cohortMetric];
+  const dash = `<span style="color:var(--muted)">–</span>`;
+
+  el.innerHTML = `<table class="cohort-tbl">
+    <thead><tr>
+      <th style="text-align:left">Period</th>
+      ${langs.map(l => `<th>${LANG_LABEL[l] || l}</th>`).join('')}
+    </tr></thead>
+    <tbody>${periods.map(p => `<tr>
+      <td>${p}</td>
+      ${langs.map(l => {
+        const val = getVal(agg[p]?.[l]);
+        const bg  = heatBg(val);
+        return `<td style="background:${bg}">${val != null ? Math.round(val * 100) + '%' : dash}</td>`;
+      }).join('')}
+    </tr>`).join('')}</tbody>
+  </table>
+  <div style="font-size:10px;color:var(--muted);margin-top:8px">
+    Metric: <strong>${metricLabel}</strong> &nbsp;·&nbsp; Cells with n &lt; ${MIN_N} signups shown as – &nbsp;·&nbsp; Green = better, red = worse
+  </div>`;
 }
 
 // Init default: previous week
