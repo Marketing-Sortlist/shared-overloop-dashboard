@@ -322,15 +322,25 @@
       <div id="funnel-v2-steps"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
-      <h3>Onboarding v2 — Leaking Buckets by Channel</h3>
-      <div class="source-grid" id="source-grid-v2">
-        <div class="loading"><div class="spinner"></div></div>
+      <h3 class="collapsible-hdr" onclick="toggleSection('source-grid-v2-wrap','buckets-ch-v2-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2 — Leaking Buckets by Channel
+        <span id="buckets-ch-v2-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="source-grid-v2-wrap" style="display:none">
+        <div class="source-grid" id="source-grid-v2">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
     <div class="section-card">
-      <h3>Onboarding v2 — Leaking Buckets by Device</h3>
-      <div id="device-grid-v2" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
-        <div class="loading"><div class="spinner"></div></div>
+      <h3 class="collapsible-hdr" onclick="toggleSection('device-grid-v2-wrap','buckets-dev-v2-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2 — Leaking Buckets by Device
+        <span id="buckets-dev-v2-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="device-grid-v2-wrap" style="display:none">
+        <div id="device-grid-v2" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
     <div class="section-card" style="overflow-x:auto">
