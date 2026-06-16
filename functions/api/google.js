@@ -37,7 +37,7 @@ async function fetchAllRows(env, accessToken, query) {
 
     let data;
     let lastErr;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
       const text = await response.text();
       try {
@@ -48,14 +48,12 @@ async function fetchAllRows(env, accessToken, query) {
         continue;
       }
       if (data.error) {
-        // Retry transient server-side / quota errors; fail fast on the rest.
-        const code = data.error.code;
-        if (code === 500 || code === 503 || code === 429) {
-          lastErr = new Error(data.error.message || JSON.stringify(data.error));
-          await sleep(400 * (attempt + 1));
-          continue;
-        }
-        throw new Error(data.error.message || JSON.stringify(data.error));
+        // The query is valid, yet Google's REST endpoint intermittently returns
+        // spurious errors (INVALID_ARGUMENT / 500 / 503 / 429) for the identical
+        // request, so retry every error a few times before giving up.
+        lastErr = new Error(data.error.message || JSON.stringify(data.error));
+        await sleep(400 * (attempt + 1));
+        continue;
       }
       lastErr = null;
       break;
