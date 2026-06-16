@@ -32,7 +32,7 @@ async function fetchAllRows(env, accessToken, query) {
   let pageToken = null;
 
   do {
-    const body = { query, pageSize: 10000 };
+    const body = { query };
     if (pageToken) body.pageToken = pageToken;
 
     let data;
