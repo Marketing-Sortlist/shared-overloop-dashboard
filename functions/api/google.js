@@ -14,6 +14,61 @@ async function getAccessToken(env) {
   return data.access_token;
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Paginated, non-streaming search. searchStream is unreliable on Cloudflare
+// Workers (the stream is read empty ~50% of the time → silent 0 spend), so we
+// use googleAds:search with pageToken pagination and retry on transient errors.
+async function fetchAllRows(env, accessToken, query) {
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    'developer-token': env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    'login-customer-id': env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
+    'Content-Type': 'application/json',
+  };
+  const endpoint = `https://googleads.googleapis.com/v20/customers/${env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:search`;
+
+  const rows = [];
+  let pageToken = null;
+
+  do {
+    const body = { query, pageSize: 10000 };
+    if (pageToken) body.pageToken = pageToken;
+
+    let data;
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch {
+        lastErr = new Error(`Google Ads API returned non-JSON: ${text.slice(0, 300)}`);
+        await sleep(400 * (attempt + 1));
+        continue;
+      }
+      if (data.error) {
+        // Retry transient server-side / quota errors; fail fast on the rest.
+        const code = data.error.code;
+        if (code === 500 || code === 503 || code === 429) {
+          lastErr = new Error(data.error.message || JSON.stringify(data.error));
+          await sleep(400 * (attempt + 1));
+          continue;
+        }
+        throw new Error(data.error.message || JSON.stringify(data.error));
+      }
+      lastErr = null;
+      break;
+    }
+    if (lastErr) throw lastErr;
+
+    for (const r of (data.results || [])) rows.push(r);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+
+  return rows;
+}
+
 function getDateRange(url) {
   const params = url.searchParams;
   if (params.get('since') && params.get('until')) {
@@ -54,34 +109,7 @@ export async function onRequest(context) {
       ORDER BY segments.date DESC
     `;
 
-    const response = await fetch(
-      `https://googleads.googleapis.com/v20/customers/${env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:searchStream`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'developer-token': env.GOOGLE_ADS_DEVELOPER_TOKEN,
-          'login-customer-id': env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      }
-    );
-
-    const text = await response.text();
-    let results;
-    try {
-      results = JSON.parse(text);
-    } catch {
-      throw new Error(`Google Ads API returned non-JSON: ${text.slice(0, 300)}`);
-    }
-
-    if (!Array.isArray(results)) {
-      if (results.error) throw new Error(results.error.message || JSON.stringify(results.error));
-      throw new Error(JSON.stringify(results));
-    }
-
-    const rows = results.flatMap(r => r.results || []);
+    const rows = await fetchAllRows(env, accessToken, query);
 
     const campaignMap = {};
     const dailyMap = {};
