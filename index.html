@@ -1714,7 +1714,7 @@ function renderV2ConversionChart() {
       datasets: [
         { label: 'Signup→Trial',  data: signupTrial,  borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)', tension: 0.3, pointRadius: 3, fill: false },
         { label: 'Trial→Active',  data: trialActive,  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', tension: 0.3, pointRadius: 3, fill: false, ...dashed },
-        { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.3, pointRadius: 3, fill: false, ...dashed },
+        { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.3, pointRadius: 3, fill: false, hidden: true, ...dashed },
       ]
     },
     options: {
