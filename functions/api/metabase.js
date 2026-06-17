@@ -585,6 +585,7 @@ export async function onRequest(context) {
     } catch (e) { funnel_v2 = { steps: Array(9).fill(0), total: 0, _error: e.message }; }
 
     // V2 per-period trials / activations (same structure as V1 trials_daily / activations_daily)
+    let funnel_v2_period = [];
     try {
       const v2PeriodRows = await runSQL(env, `
         WITH raw AS (
@@ -596,12 +597,14 @@ export async function onRequest(context) {
           ${V2_BASE} GROUP BY period, u.email, source
         )
         SELECT period::text, source,
+          COUNT(*) FILTER (WHERE step_num >= 1) AS signups,
+          COUNT(*) FILTER (WHERE step_num >= 7) AS stripe,
           COUNT(*) FILTER (WHERE step_num >= 8) AS trialing,
           COUNT(*) FILTER (WHERE step_num >= 9) AS active
         FROM raw GROUP BY period, source ORDER BY period
       `);
-      const tMap = {}, aMap = {};
-      for (const [period, source, t, a] of v2PeriodRows) {
+      const tMap = {}, aMap = {}, periodMap = {};
+      for (const [period, source, sg, st, t, a] of v2PeriodRows) {
         const d = String(period).slice(0, 10);
         if (!tMap[d]) tMap[d] = { date: d, count: 0 };
         tMap[d][source] = (tMap[d][source] || 0) + Number(t);
@@ -609,9 +612,15 @@ export async function onRequest(context) {
         if (!aMap[d]) aMap[d] = { date: d, count: 0 };
         aMap[d][source] = (aMap[d][source] || 0) + Number(a);
         aMap[d].count += Number(a);
+        if (!periodMap[d]) periodMap[d] = { date: d, signups: 0, stripe: 0, trialing: 0, active: 0 };
+        periodMap[d].signups  += Number(sg);
+        periodMap[d].stripe   += Number(st);
+        periodMap[d].trialing += Number(t);
+        periodMap[d].active   += Number(a);
       }
       trials_v2_daily      = Object.values(tMap).sort((x, y) => x.date.localeCompare(y.date));
       activations_v2_daily = Object.values(aMap).sort((x, y) => x.date.localeCompare(y.date));
+      funnel_v2_period     = Object.values(periodMap).sort((x, y) => x.date.localeCompare(y.date));
     } catch (_) {}
 
     // 1c (V2 part). Trials by source + utm_campaign — V2 (merged into tCampMap from 1c)
@@ -862,6 +871,7 @@ export async function onRequest(context) {
       funnel_v2_by_device,
       trials_v2_daily,
       activations_v2_daily,
+      funnel_v2_period,
       cancellations_daily,
       cancellations_v2_daily,
       trial_behavior_v2,

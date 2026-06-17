@@ -388,6 +388,10 @@
       <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
+      <h3>Onboarding v2 — Conversion Rates Over Time</h3>
+      <canvas id="v2-conversion-chart" height="90"></canvas>
+    </div>
+    <div class="section-card">
       <h3>Onboarding v2 — Trial Behaviour</h3>
       <div id="trial-behavior-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
@@ -508,7 +512,7 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let currentGranularity = 'week';
-let spendChart, donutChart, signupsChart, costEvolutionChart;
+let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
 let annotationsData = {}; // { 'YYYY-MM-DD': { date, text, created_at } }
 let funnelFilter   = { type: null, value: null }; // type: 'source'|'device', value: key
@@ -887,6 +891,7 @@ async function loadAll() {
   renderSourceGridV2();
   renderDeviceGridV2();
   renderSourceTableV2();
+  renderV2ConversionChart();
   renderTrialBehaviorV2();
   renderFunnelSteps();
   renderSourceGrid();
@@ -1647,32 +1652,86 @@ function renderSourceTableV2() {
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
 
   const rows = srcKeys.map(key => {
-    const v        = fbs[key] || [];
-    const signups  = v[0] || 0;
-    const domain   = v[1] || 0;
-    const stripe   = v[6] || 0;
-    const trialing = v[7] || 0;
-    const active   = v[8] || 0;
-    const rTrial   = signups > 0 ? ((trialing / signups) * 100).toFixed(1) + '%' : '–';
-    const rActive  = signups > 0 ? ((active   / signups) * 100).toFixed(1) + '%' : '–';
+    const v          = fbs[key] || [];
+    const signups    = v[0] || 0;
+    const stripe     = v[6] || 0;
+    const trialing   = v[7] || 0;
+    const active     = v[8] || 0;
+    const rSignTrial = signups  > 0 ? ((trialing / signups)  * 100).toFixed(1) + '%' : '–';
+    const rTrialAct  = trialing > 0 ? ((active   / trialing) * 100).toFixed(1) + '%' : '–';
+    const rStripeTri = stripe   > 0 ? ((trialing / stripe)   * 100).toFixed(1) + '%' : '–';
+    const rSignAct   = signups  > 0 ? ((active   / signups)  * 100).toFixed(1) + '%' : '–';
     return `<tr>
       <td>${srcLabel(key)}</td>
       <td>${fmtN(signups)}</td>
-      <td>${fmtN(domain)}</td>
       <td>${fmtN(stripe)}</td>
       <td>${fmtN(trialing)}</td>
       <td>${fmtN(active)}</td>
-      <td>${rTrial}</td>
-      <td>${rActive}</td>
+      <td>${rSignTrial}</td>
+      <td>${rTrialAct}</td>
+      <td>${rStripeTri}</td>
+      <td>${rSignAct}</td>
     </tr>`;
   });
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Source</th><th>Signups</th><th>Domain</th><th>Stripe</th><th>Trialing</th><th>Active</th><th>Signup→Trial</th><th>Signup→Active</th>
+      <th>Source</th><th>Signups</th><th>Stripe</th><th>Trialing</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>Stripe→Trial</th><th>Signup→Active</th>
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>`;
+}
+
+function renderV2ConversionChart() {
+  const { mb } = state;
+  const canvas = document.getElementById('v2-conversion-chart');
+  if (!canvas) return;
+  if (v2ConversionChart) { v2ConversionChart.destroy(); v2ConversionChart = null; }
+
+  const periods = mb?.funnel_v2_period;
+  if (!periods || periods.length === 0) {
+    canvas.parentElement.insertAdjacentHTML('beforeend', '<p class="no-data" style="margin-top:8px">No period data available</p>');
+    return;
+  }
+
+  const labels = periods.map(p => p.date);
+  const pct = (num, den) => den > 0 ? parseFloat(((num / den) * 100).toFixed(1)) : null;
+
+  const signupTrial  = periods.map(p => pct(p.trialing, p.signups));
+  const trialActive  = periods.map(p => pct(p.active,   p.trialing));
+  const signupActive = periods.map(p => pct(p.active,   p.signups));
+
+  v2ConversionChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Signup→Trial',  data: signupTrial,  borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
+        { label: 'Trial→Active',  data: trialActive,  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
+        { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y + '%' : '–'}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: {
+          ticks: { color: '#94a3b8', callback: v => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          min: 0
+        }
+      }
+    }
+  });
 }
 
 function renderTrialBehaviorV2() {
