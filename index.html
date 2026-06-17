@@ -1701,14 +1701,20 @@ function renderV2ConversionChart() {
   const trialActive  = periods.map(p => pct(p.active,   p.trialing));
   const signupActive = periods.map(p => pct(p.active,   p.signups));
 
+  const cutoffStr = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const cutoffIdx = labels.findIndex(l => l >= cutoffStr);
+  const dashed = cutoffIdx >= 0
+    ? { segment: { borderDash: ctx => ctx.p1DataIndex >= cutoffIdx ? [5, 4] : undefined } }
+    : {};
+
   v2ConversionChart = new Chart(canvas, {
     type: 'line',
     data: {
       labels,
       datasets: [
-        { label: 'Signup→Trial',  data: signupTrial,  borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
-        { label: 'Trial→Active',  data: trialActive,  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
-        { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)',  tension: 0.3, pointRadius: 3, fill: false },
+        { label: 'Signup→Trial',  data: signupTrial,  borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)', tension: 0.3, pointRadius: 3, fill: false },
+        { label: 'Trial→Active',  data: trialActive,  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', tension: 0.3, pointRadius: 3, fill: false, ...dashed },
+        { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.3, pointRadius: 3, fill: false, ...dashed },
       ]
     },
     options: {
@@ -1732,6 +1738,11 @@ function renderV2ConversionChart() {
       }
     }
   });
+
+  const note = canvas.parentElement.querySelector('.v2-conv-note');
+  if (!note) {
+    canvas.insertAdjacentHTML('afterend', '<p class="data-note v2-conv-note" style="margin-top:10px">Trial→Active and Signup→Active rates are understated for the last 14 days — users signed up in that window are still within their trial period and haven\'t had enough time to convert yet. Dashed lines indicate provisional data.</p>');
+  }
 }
 
 function renderTrialBehaviorV2() {
