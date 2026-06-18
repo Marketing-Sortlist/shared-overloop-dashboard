@@ -957,6 +957,81 @@ function renderKPIs() {
   ).join('');
 }
 
+const PENCIL_CURSOR = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%23f59e0b' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E\") 0 20, crosshair";
+
+function drawCommentIcon(ctx, cx, cy, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx - w/2 + r, cy - h);
+  ctx.lineTo(cx + w/2 - r, cy - h);
+  ctx.quadraticCurveTo(cx + w/2, cy - h, cx + w/2, cy - h + r);
+  ctx.lineTo(cx + w/2, cy - r);
+  ctx.quadraticCurveTo(cx + w/2, cy, cx + w/2 - r, cy);
+  ctx.lineTo(cx + 3, cy);
+  ctx.lineTo(cx, cy + 5);
+  ctx.lineTo(cx - 3, cy);
+  ctx.lineTo(cx - w/2 + r, cy);
+  ctx.quadraticCurveTo(cx - w/2, cy, cx - w/2, cy - r);
+  ctx.lineTo(cx - w/2, cy - h + r);
+  ctx.quadraticCurveTo(cx - w/2, cy - h, cx - w/2 + r, cy - h);
+  ctx.closePath();
+}
+
+const annMarkerPlugin = {
+  id: 'annMarkers',
+  afterDraw(chart) {
+    const chartDates = chart._annotDates;
+    if (!chartDates) return;
+    const { ctx, chartArea } = chart;
+    const xScale = chart.scales.x;
+    ctx.save();
+    const annotData = chart._annotData || annotationsData;
+    for (let i = 0; i < chartDates.length; i++) {
+      if (!annotData[chartDates[i]]) continue;
+      const px = xScale.getPixelForValue(i);
+      ctx.strokeStyle = 'rgba(245,158,11,0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(px, chartArea.top);
+      ctx.lineTo(px, chartArea.bottom - 18);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#f59e0b';
+      drawCommentIcon(ctx, px, chartArea.bottom - 4, 18, 13, 3);
+      ctx.fill();
+      ctx.fillStyle = '#0b0f1a';
+      for (let d = -4; d <= 4; d += 4) {
+        ctx.beginPath();
+        ctx.arc(px + d, chartArea.bottom - 10, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  },
+  afterEvent(chart, args) {
+    const e = args.event;
+    if (e.type !== 'mousemove' && e.type !== 'click') return;
+    const ca = chart.chartArea;
+    const inZone = e.y >= ca.top && e.y <= ca.bottom && e.x >= ca.left && e.x <= ca.right;
+    if (e.type === 'mousemove') {
+      chart.canvas.style.cursor = inZone ? PENCIL_CURSOR : 'default';
+    }
+    if (e.type === 'click' && inZone) {
+      const chartDates = chart._annotDates || [];
+      const xScale = chart.scales.x;
+      let nearestIdx = -1, nearestDist = Infinity;
+      for (let i = 0; i < chartDates.length; i++) {
+        const d = Math.abs(e.x - xScale.getPixelForValue(i));
+        if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+      }
+      if (nearestIdx >= 0 && nearestDist < 60) {
+        const openFn = chart._openAnnotModal || openAnnotationModal;
+        openFn(chartDates[nearestIdx]);
+      }
+    }
+  },
+};
+
 function renderCostEvolution() {
   const { meta, google, mb } = state;
   if (costEvolutionChart) { costEvolutionChart.destroy(); costEvolutionChart = null; }
@@ -1023,85 +1098,6 @@ function renderCostEvolution() {
     { type: 'line', label: 'Cost/Active', data: cAct, borderColor: '#22c55e', backgroundColor: 'transparent',
       fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true, yAxisID: 'y', order: 1, hidden: true },
   ];
-
-  const PENCIL_CURSOR = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%23f59e0b' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E\") 0 20, crosshair";
-
-  function drawCommentIcon(ctx, cx, cy, w, h, r) {
-    // Speech bubble: rounded rect + small tail
-    ctx.beginPath();
-    ctx.moveTo(cx - w/2 + r, cy - h);
-    ctx.lineTo(cx + w/2 - r, cy - h);
-    ctx.quadraticCurveTo(cx + w/2, cy - h, cx + w/2, cy - h + r);
-    ctx.lineTo(cx + w/2, cy - r);
-    ctx.quadraticCurveTo(cx + w/2, cy, cx + w/2 - r, cy);
-    ctx.lineTo(cx + 3, cy);
-    ctx.lineTo(cx, cy + 5);
-    ctx.lineTo(cx - 3, cy);
-    ctx.lineTo(cx - w/2 + r, cy);
-    ctx.quadraticCurveTo(cx - w/2, cy, cx - w/2, cy - r);
-    ctx.lineTo(cx - w/2, cy - h + r);
-    ctx.quadraticCurveTo(cx - w/2, cy - h, cx - w/2 + r, cy - h);
-    ctx.closePath();
-  }
-
-  const annMarkerPlugin = {
-    id: 'annMarkers',
-    afterDraw(chart) {
-      const chartDates = chart._annotDates;
-      if (!chartDates) return;
-      const { ctx, chartArea } = chart;
-      const xScale = chart.scales.x;
-      ctx.save();
-      const annotData = chart._annotData || annotationsData;
-      for (let i = 0; i < chartDates.length; i++) {
-        if (!annotData[chartDates[i]]) continue;
-        const px = xScale.getPixelForValue(i);
-        // Dashed vertical line
-        ctx.strokeStyle = 'rgba(245,158,11,0.45)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(px, chartArea.top);
-        ctx.lineTo(px, chartArea.bottom - 18);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // Comment bubble icon
-        ctx.fillStyle = '#f59e0b';
-        drawCommentIcon(ctx, px, chartArea.bottom - 4, 18, 13, 3);
-        ctx.fill();
-        // Three dots inside bubble
-        ctx.fillStyle = '#0b0f1a';
-        for (let d = -4; d <= 4; d += 4) {
-          ctx.beginPath();
-          ctx.arc(px + d, chartArea.bottom - 10, 1.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      ctx.restore();
-    },
-    afterEvent(chart, args) {
-      const e = args.event;
-      if (e.type !== 'mousemove' && e.type !== 'click') return;
-      const ca = chart.chartArea;
-      const inZone = e.y >= ca.top && e.y <= ca.bottom && e.x >= ca.left && e.x <= ca.right;
-      if (e.type === 'mousemove') {
-        chart.canvas.style.cursor = inZone ? PENCIL_CURSOR : 'default';
-      }
-      if (e.type === 'click' && inZone) {
-        const chartDates = chart._annotDates || [];
-        const xScale = chart.scales.x;
-        let nearestIdx = -1, nearestDist = Infinity;
-        for (let i = 0; i < chartDates.length; i++) {
-          const d = Math.abs(e.x - xScale.getPixelForValue(i));
-          if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
-        }
-        if (nearestIdx >= 0 && nearestDist < 60) {
-          const openFn = chart._openAnnotModal || openAnnotationModal;
-          openFn(chartDates[nearestIdx]);
-        }
-      }
-    },
-  };
 
   costEvolutionChart = new Chart(document.getElementById('costEvolutionChart'), {
     type: 'bar',
