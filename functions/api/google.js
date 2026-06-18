@@ -26,7 +26,7 @@ async function fetchAllRows(env, accessToken, query) {
     'login-customer-id': env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
     'Content-Type': 'application/json',
   };
-  const endpoint = `https://googleads.googleapis.com/v20/customers/${env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:search`;
+  const endpoint = `https://googleads.googleapis.com/v22/customers/${env.GOOGLE_ADS_CUSTOMER_ID}/googleAds:search`;
 
   const rows = [];
   let pageToken = null;
@@ -51,7 +51,7 @@ async function fetchAllRows(env, accessToken, query) {
         // The query is valid, yet Google's REST endpoint intermittently returns
         // spurious errors (INVALID_ARGUMENT / 500 / 503 / 429) for the identical
         // request, so retry every error a few times before giving up.
-        lastErr = new Error(JSON.stringify(data.error));
+        lastErr = new Error(data.error.message || JSON.stringify(data.error));
         await sleep(400 * (attempt + 1));
         continue;
       }
