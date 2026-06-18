@@ -514,7 +514,9 @@
 let currentGranularity = 'week';
 let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
-let annotationsData = {}; // { 'YYYY-MM-DD': { date, text, created_at } }
+let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
+let annotationsV2Data = {}; // same shape — Onboarding V2 chart (independent)
+let currentAnnotNamespace = 'all'; // tracks which chart opened the annotation modal
 let funnelFilter   = { type: null, value: null }; // type: 'source'|'device', value: key
 let funnelV2Filter = { type: null, value: null }; // type: 'source', value: key
 let activeFunnelTab = 'v2';
@@ -866,6 +868,7 @@ async function loadAll() {
     fetch(`${base}/api/metabase?${dr}&granularity=${currentGranularity}`).then(r => r.json()),
   ]);
   loadAnnotations();
+  loadAnnotationsV2();
 
   const meta   = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
   const google = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
@@ -1049,8 +1052,9 @@ function renderCostEvolution() {
       const { ctx, chartArea } = chart;
       const xScale = chart.scales.x;
       ctx.save();
+      const annotData = chart._annotData || annotationsData;
       for (let i = 0; i < chartDates.length; i++) {
-        if (!annotationsData[chartDates[i]]) continue;
+        if (!annotData[chartDates[i]]) continue;
         const px = xScale.getPixelForValue(i);
         // Dashed vertical line
         ctx.strokeStyle = 'rgba(245,158,11,0.45)';
@@ -1091,7 +1095,10 @@ function renderCostEvolution() {
           const d = Math.abs(e.x - xScale.getPixelForValue(i));
           if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
         }
-        if (nearestIdx >= 0 && nearestDist < 60) openAnnotationModal(chartDates[nearestIdx]);
+        if (nearestIdx >= 0 && nearestDist < 60) {
+          const openFn = chart._openAnnotModal || openAnnotationModal;
+          openFn(chartDates[nearestIdx]);
+        }
       }
     },
   };
@@ -1130,6 +1137,7 @@ function renderCostEvolution() {
     },
   });
   costEvolutionChart._annotDates = dates;
+  costEvolutionChart._annotData = annotationsData;
 }
 
 function renderCostBySource() {
@@ -1717,6 +1725,7 @@ function renderV2ConversionChart() {
         { label: 'Signup→Active', data: signupActive, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension: 0.3, pointRadius: 3, fill: false, hidden: true, ...dashed },
       ]
     },
+    plugins: [annMarkerPlugin],
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
@@ -1738,6 +1747,9 @@ function renderV2ConversionChart() {
       }
     }
   });
+  v2ConversionChart._annotDates = labels;
+  v2ConversionChart._annotData = annotationsV2Data;
+  v2ConversionChart._openAnnotModal = (date) => openAnnotationModal(date, 'onboarding_v2');
 
   const note = canvas.parentElement.querySelector('.v2-conv-note');
   if (!note) {
@@ -2558,8 +2570,23 @@ async function loadAnnotations() {
   } catch (_) {}
 }
 
-function openAnnotationModal(date) {
-  const existing = annotationsData[date];
+async function loadAnnotationsV2() {
+  try {
+    const res = await fetch(`${window.location.origin}/api/annotations?namespace=onboarding_v2`);
+    const data = await res.json();
+    annotationsV2Data = {};
+    for (const a of (data.annotations || [])) annotationsV2Data[a.date] = a;
+    if (v2ConversionChart) {
+      v2ConversionChart._annotData = annotationsV2Data;
+      v2ConversionChart.update();
+    }
+  } catch (_) {}
+}
+
+function openAnnotationModal(date, namespace) {
+  currentAnnotNamespace = namespace || 'all';
+  const store = currentAnnotNamespace === 'onboarding_v2' ? annotationsV2Data : annotationsData;
+  const existing = store[date];
   document.getElementById('ann-date').textContent = date;
   document.getElementById('ann-text').value = existing ? existing.text : '';
   document.getElementById('ann-delete-btn').style.display = existing ? 'inline-flex' : 'none';
@@ -2575,27 +2602,41 @@ async function saveAnnotation() {
   const date = document.getElementById('ann-date').textContent;
   const text = document.getElementById('ann-text').value.trim();
   if (!text) return;
+  const ns = currentAnnotNamespace;
+  const store = ns === 'onboarding_v2' ? annotationsV2Data : annotationsData;
   try {
-    const res = await fetch(`${window.location.origin}/api/annotations`, {
+    const res = await fetch(`${window.location.origin}/api/annotations?namespace=${ns}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date, text }),
     });
     const data = await res.json();
-    if (data.ok) { annotationsData[date] = data.annotation; closeAnnotationModal(); renderCostEvolution(); }
+    if (data.ok) {
+      store[date] = data.annotation;
+      closeAnnotationModal();
+      if (ns === 'onboarding_v2') { if (v2ConversionChart) v2ConversionChart.update(); }
+      else renderCostEvolution();
+    }
   } catch (_) {}
 }
 
 async function deleteAnnotation() {
   const date = document.getElementById('ann-date').textContent;
+  const ns = currentAnnotNamespace;
+  const store = ns === 'onboarding_v2' ? annotationsV2Data : annotationsData;
   try {
-    const res = await fetch(`${window.location.origin}/api/annotations`, {
+    const res = await fetch(`${window.location.origin}/api/annotations?namespace=${ns}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date }),
     });
     const data = await res.json();
-    if (data.ok) { delete annotationsData[date]; closeAnnotationModal(); renderCostEvolution(); }
+    if (data.ok) {
+      delete store[date];
+      closeAnnotationModal();
+      if (ns === 'onboarding_v2') { if (v2ConversionChart) v2ConversionChart.update(); }
+      else renderCostEvolution();
+    }
   } catch (_) {}
 }
 

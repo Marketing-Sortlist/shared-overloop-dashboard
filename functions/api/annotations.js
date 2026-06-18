@@ -1,6 +1,8 @@
 // Cloudflare KV binding: ANNOTATIONS
-// KV key: "all" → JSON array of { date, text, created_at }
-// Sorted by date ascending.
+// KV key: namespace param (default "all") → JSON array of { date, text, created_at }
+// Each chart uses its own namespace so annotations don't cross:
+//   "all"          → Performance tab (Cost Per Outcome chart)
+//   "onboarding_v2" → Onboarding tab (Conversion Rates Over Time chart)
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -16,14 +18,18 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const url = new URL(request.url);
+  const rawNs = url.searchParams.get('namespace') || 'all';
+  const namespace = /^[a-z0-9_]{1,50}$/.test(rawNs) ? rawNs : 'all';
+
   async function load() {
-    const raw = await kv.get('all');
+    const raw = await kv.get(namespace);
     return raw ? JSON.parse(raw) : [];
   }
 
   async function save(list) {
     list.sort((a, b) => a.date.localeCompare(b.date));
-    await kv.put('all', JSON.stringify(list));
+    await kv.put(namespace, JSON.stringify(list));
   }
 
   try {
