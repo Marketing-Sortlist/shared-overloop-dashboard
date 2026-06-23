@@ -884,9 +884,10 @@ async function loadAll() {
   const mb         = mbR.status === 'fulfilled' && !mbR.value?.error  ? mbR.value  : null;
   const metaAdsets = maR.status === 'fulfilled' && !maR.value?.error  ? maR.value  : null;
 
-  if (!meta)       errors.push('Meta: '        + (mR.value?.error   || mR.reason?.message   || 'failed'));
-  if (!google)     errors.push('Google Ads: '  + (gR.value?.error   || gR.reason?.message   || 'failed'));
-  if (!mb)         errors.push('Metabase: '    + (mbR.value?.error  || mbR.reason?.message  || 'failed'));
+  if (!meta)       errors.push('Meta: '         + (mR.value?.error   || mR.reason?.message   || 'failed'));
+  if (!google)     errors.push('Google Ads: '   + (gR.value?.error   || gR.reason?.message   || 'failed'));
+  if (!mb)         errors.push('Metabase: '     + (mbR.value?.error  || mbR.reason?.message  || 'failed'));
+  if (!metaAdsets) errors.push('Meta Adsets: '  + (maR.value?.error  || maR.reason?.message  || 'failed'));
 
   const banner = document.getElementById('error-banner');
   banner.style.display = errors.length ? 'block' : 'none';

@@ -31,16 +31,13 @@ async function fetchAllPages(initialUrl) {
 async function queryMetabase(env, query) {
   const res = await fetch(`${env.METABASE_URL}/api/dataset`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Metabase-Session': env.METABASE_SESSION,
-    },
-    body: JSON.stringify({ database: DB_ID, type: 'native', native: { query }, parameters: [] }),
+    headers: { 'x-api-key': env.METABASE_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ database: DB_ID, type: 'native', native: { query } }),
   });
+  if (!res.ok) throw new Error(`Metabase ${res.status}: ${await res.text()}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error);
-  const cols = (data.data?.cols || []).map(c => c.name);
-  return (data.data?.rows || []).map(row => Object.fromEntries(cols.map((c, i) => [c, row[i]])));
+  return data?.data?.rows || [];
 }
 
 export async function onRequest(context) {
@@ -85,12 +82,14 @@ export async function onRequest(context) {
       `),
     ]);
 
+    // mbRows are positional arrays: [adset_id, signups, trialing]
     const mbMap = {};
     for (const row of mbRows) {
-      if (row.adset_id) {
-        mbMap[row.adset_id] = {
-          signups: parseInt(row.signups || 0),
-          trialing: parseInt(row.trialing || 0),
+      const adsetId = row[0];
+      if (adsetId) {
+        mbMap[adsetId] = {
+          signups: parseInt(row[1] || 0),
+          trialing: parseInt(row[2] || 0),
         };
       }
     }
