@@ -334,6 +334,14 @@
     </div>
   </div>
 
+  <div class="section-card" style="overflow-x:auto">
+    <h3 class="collapsible-hdr" onclick="toggleSection('meta-adsets-body','meta-adsets-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+      <span class="badge badge-meta">META</span> Adsets — by Campaign
+      <span id="meta-adsets-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+    <div id="meta-adsets-body" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
   <div class="attr-note">
     Attribution: Meta = 7d click + 1d view &nbsp;·&nbsp; Google Ads = last click &nbsp;·&nbsp; Signups/Funnel = Metabase (facebook utm → Meta; google utm or _gcl_aw → Google Ads; youtube/trustpilot/etc utm → shown by name; no utm → Organic)
   </div>
@@ -862,27 +870,29 @@ async function loadAll() {
   const base = window.location.origin;
 
   const dr = `since=${activeSince}&until=${activeUntil}`;
-  const [mR, gR, mbR] = await Promise.allSettled([
+  const [mR, gR, mbR, maR] = await Promise.allSettled([
     fetch(`${base}/api/meta?${dr}`).then(r => r.json()),
     fetch(`${base}/api/google?${dr}`).then(r => r.json()),
     fetch(`${base}/api/metabase?${dr}&granularity=${currentGranularity}`).then(r => r.json()),
+    fetch(`${base}/api/meta-adsets?${dr}`).then(r => r.json()),
   ]);
   loadAnnotations();
   loadAnnotationsV2();
 
-  const meta   = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
-  const google = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
-  const mb     = mbR.status === 'fulfilled' && !mbR.value?.error  ? mbR.value  : null;
+  const meta       = mR.status  === 'fulfilled' && !mR.value?.error   ? mR.value   : null;
+  const google     = gR.status  === 'fulfilled' && !gR.value?.error   ? gR.value   : null;
+  const mb         = mbR.status === 'fulfilled' && !mbR.value?.error  ? mbR.value  : null;
+  const metaAdsets = maR.status === 'fulfilled' && !maR.value?.error  ? maR.value  : null;
 
-  if (!meta)   errors.push('Meta: '   + (mR.value?.error   || mR.reason?.message   || 'failed'));
-  if (!google) errors.push('Google Ads: ' + (gR.value?.error   || gR.reason?.message   || 'failed'));
-  if (!mb)     errors.push('Metabase: '+ (mbR.value?.error || mbR.reason?.message  || 'failed'));
+  if (!meta)       errors.push('Meta: '        + (mR.value?.error   || mR.reason?.message   || 'failed'));
+  if (!google)     errors.push('Google Ads: '  + (gR.value?.error   || gR.reason?.message   || 'failed'));
+  if (!mb)         errors.push('Metabase: '    + (mbR.value?.error  || mbR.reason?.message  || 'failed'));
 
   const banner = document.getElementById('error-banner');
   banner.style.display = errors.length ? 'block' : 'none';
   if (errors.length) banner.textContent = '⚠ Partial data: ' + errors.join(' · ');
 
-  state = { meta, google, mb };
+  state = { meta, google, mb, metaAdsets };
   renderKPIs();
   renderCostEvolution();
   renderCostByPeriod();
@@ -890,6 +900,7 @@ async function loadAll() {
   renderSpendCharts();
   renderSignupsChart();
   renderTables();
+  renderMetaAdsets();
   renderFunnelV2Steps();
   renderSourceGridV2();
   renderDeviceGridV2();
@@ -1453,6 +1464,60 @@ function renderTables() {
       <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
     </tr></thead><tbody>${rows.join('')}</tbody></table>`;
   }
+}
+
+function renderMetaAdsets() {
+  const { metaAdsets } = state;
+  const el = document.getElementById('meta-adsets-body');
+  if (!el) return;
+
+  if (!metaAdsets) { el.innerHTML = '<p class="no-data">No adset data</p>'; return; }
+
+  const campaigns = metaAdsets.campaigns || [];
+  if (!campaigns.length) { el.innerHTML = '<p class="no-data">No adset data for this period</p>'; return; }
+
+  function cpColor(cp) {
+    if (cp == null) return '';
+    if (cp <= 35)  return 'color:var(--green);font-weight:600';
+    if (cp <= 65)  return 'color:var(--yellow);font-weight:600';
+    return 'color:var(--red);font-weight:600';
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>Adset</th>
+      <th style="text-align:right">Spend</th>
+      <th style="text-align:right">Leads</th>
+      <th style="text-align:right">CPL</th>
+      <th style="text-align:right">CTR</th>
+      <th style="text-align:right">Signups (DB)</th>
+      <th style="text-align:right">Trials (DB)</th>
+      <th style="text-align:right">CP Trial</th>
+    </tr></thead><tbody>`;
+
+  for (const campaign of campaigns) {
+    html += `<tr style="background:var(--surface2)">
+      <td colspan="8" style="font-size:11px;font-weight:700;color:var(--meta);padding:5px 8px;text-transform:uppercase;letter-spacing:0.4px">
+        ${campaign.campaign_name}
+      </td>
+    </tr>`;
+    for (const a of campaign.adsets) {
+      const cpSt = cpColor(a.cp_trial);
+      html += `<tr>
+        <td style="padding-left:18px">${a.adset_name}</td>
+        <td style="text-align:right">${fmt$(a.spend)}</td>
+        <td style="text-align:right">${fmtN(a.leads)}</td>
+        <td style="text-align:right">${a.leads > 0 ? fmtCur(a.cpl) : '–'}</td>
+        <td style="text-align:right">${fmtPct(a.ctr)}</td>
+        <td style="text-align:right">${fmtN(a.signups)}</td>
+        <td style="text-align:right">${fmtN(a.trialing)}</td>
+        <td style="text-align:right;${cpSt}">${a.cp_trial != null ? fmtCur(a.cp_trial) : '–'}</td>
+      </tr>`;
+    }
+  }
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 // ══ FUNNEL SUB-TABS ═══════════════════════════════════════════════════════
