@@ -54,10 +54,24 @@ const SOURCE_CASE = `
 
 const CAMPAIGN_CASE = `LOWER(COALESCE(substring(companies.signup_url, 'utm_campaign=([^&]*)'), ''))`;
 
+// "Ever active" = the contact has been a paying customer at some point.
+// The subscriptions table keeps no history (one row per company, updated in place),
+// so we combine two signals so an activation is never lost as the status evolves:
+//   - status IN ('active','past_due','unpaid'): currently paying OR in dunning.
+//     past_due/unpaid only occur AFTER being active, so they still count.
+//   - subscribed_at IS NOT NULL (across any of the company's subscription rows):
+//     was billed at least once, e.g. active-then-canceled.
+// Caveat: an active contact that cancels WITHOUT subscribed_at ever being set
+// cannot be recovered from current data (no snapshot history exists).
+const EVER_ACTIVE = `
+  (sub.status IN ('active','past_due','unpaid')
+   OR EXISTS (SELECT 1 FROM subscriptions sx
+              WHERE sx.company_id = companies.id
+                AND sx.subscribed_at IS NOT NULL))`;
+
 const STEP_CASE = `
   CASE
-    WHEN u.current_signup_step = 'finished'
-         AND sub.status IN ('active','canceled','past_due')                                                   THEN 9
+    WHEN ${EVER_ACTIVE}                                                                                       THEN 9
     WHEN u.current_signup_step = 'finished'
          AND sub.status = 'trialing'                                                                          THEN 8
     WHEN u.current_signup_step IN ('mobile-pitch','campaign-wizard')
@@ -508,8 +522,7 @@ export async function onRequest(context) {
     // 8. V2 funnel
     const V2_STEP = `
       CASE
-        WHEN sub.status IN ('active','past_due')
-          OR (sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL) THEN 9
+        WHEN ${EVER_ACTIVE}                        THEN 9
         WHEN s.state = 'completed'                 THEN 8
         WHEN s.state = 'moved_to_stripe'           THEN 7
         WHEN s.state = 'sequence_accepted'         THEN 6
