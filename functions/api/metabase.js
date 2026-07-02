@@ -69,6 +69,14 @@ const EVER_ACTIVE = `
               WHERE sx.company_id = companies.id
                 AND sx.subscribed_at IS NOT NULL))`;
 
+// A cancellation = the contact has requested to cancel (whether it was a trial
+// or a paid subscription). Since 2026-06-25 (V2 only), canceling no longer flips
+// the status to 'canceled' immediately: the sub keeps status trialing/active with
+// cancel_at_period_end=true until the period ends, then becomes 'canceled'. Count
+// both states so cancellations are captured at request time. No double-count:
+// one subscription row per company, so a contact is in exactly one state.
+const IS_CANCELED = `(sub.status = 'canceled' OR sub.cancel_at_period_end = true)`;
+
 const STEP_CASE = `
   CASE
     WHEN ${EVER_ACTIVE}                                                                                       THEN 9
@@ -682,7 +690,7 @@ export async function onRequest(context) {
             SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
           ) u ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
-            AND sub.status = 'canceled'
+            AND ${IS_CANCELED}
             ${INTERNAL_FILTER}
             ${V1_ONLY_FILTER}
           GROUP BY 1, 2 ORDER BY 1
@@ -701,7 +709,7 @@ export async function onRequest(context) {
             SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
           ) sub ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
-            AND sub.status = 'canceled'
+            AND ${IS_CANCELED}
             ${INTERNAL_FILTER}
           GROUP BY 1, 2 ORDER BY 1
         `),
