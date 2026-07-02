@@ -1889,8 +1889,8 @@ function renderFunnelCompare() {
     { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
     { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
     { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
-    { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'sub.status = canceled + subscribed_at IS NULL (never paid)' },
-    { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'sub.status = canceled + subscribed_at IS NOT NULL (was paying)' },
+    { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
+    { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
   ];
 
   const rowColor = (label, side) => {

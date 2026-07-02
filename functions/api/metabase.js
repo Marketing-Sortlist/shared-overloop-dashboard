@@ -77,6 +77,16 @@ const EVER_ACTIVE = `
 // one subscription row per company, so a contact is in exactly one state.
 const IS_CANCELED = `(sub.status = 'canceled' OR sub.cancel_at_period_end = true)`;
 
+// Split of IS_CANCELED into never-paid vs was-paying, accounting for the
+// 2026-06-25 change: a pending cancel keeps its status (trialing / active)
+// with cancel_at_period_end=true instead of flipping to 'canceled'.
+const TRIAL_CANCEL = `(
+  (sub.status = 'canceled' AND sub.subscribed_at IS NULL)
+  OR (sub.status = 'trialing' AND sub.cancel_at_period_end = true))`;
+const PAID_CANCEL = `(
+  (sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL)
+  OR (sub.status IN ('active','past_due','unpaid') AND sub.cancel_at_period_end = true))`;
+
 const STEP_CASE = `
   CASE
     WHEN ${EVER_ACTIVE}                                                                                       THEN 9
@@ -723,10 +733,10 @@ export async function onRequest(context) {
     try {
       const ctRows = await runSQL(env, `
         SELECT
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL)     AS canceled_trial,
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL)  AS canceled_active,
-          COUNT(*) FILTER (WHERE sub.status = 'trialing')                                    AS currently_trialing,
-          COUNT(*) FILTER (WHERE sub.status = 'active')                                      AS currently_active
+          COUNT(*) FILTER (WHERE ${TRIAL_CANCEL})                                            AS canceled_trial,
+          COUNT(*) FILTER (WHERE ${PAID_CANCEL})                                              AS canceled_active,
+          COUNT(*) FILTER (WHERE sub.status = 'trialing' AND COALESCE(sub.cancel_at_period_end, false) = false) AS currently_trialing,
+          COUNT(*) FILTER (WHERE sub.status = 'active'   AND COALESCE(sub.cancel_at_period_end, false) = false) AS currently_active
         FROM subscriptions sub
         JOIN LATERAL (SELECT * FROM companies WHERE id = sub.company_id LIMIT 1) c ON true
         JOIN LATERAL (SELECT * FROM users WHERE company_id = sub.company_id ORDER BY id ASC LIMIT 1) u ON true
@@ -764,11 +774,12 @@ export async function onRequest(context) {
               WHERE sc.updated_at IS NOT NULL
                 AND NOW() <= sc.updated_at + INTERVAL '14 days'
                 AND (sub.status IS NULL OR sub.status != 'canceled')
+                AND COALESCE(sub.cancel_at_period_end, false) = false
             ) AS in_14d_window,
             COUNT(*) FILTER (
               WHERE sc.updated_at IS NOT NULL
                 AND NOW() <= sc.updated_at + INTERVAL '14 days'
-                AND sub.status = 'canceled'
+                AND (sub.status = 'canceled' OR sub.cancel_at_period_end = true)
             ) AS canceled_in_14d_window
           FROM companies
           JOIN LATERAL (
@@ -827,10 +838,10 @@ export async function onRequest(context) {
           COUNT(*) FILTER (WHERE s.state = 'completed')                                                      AS v2_trialing,
           COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)                               AS v1_active,
           COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL)                           AS v2_active,
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL AND s.user_id IS NULL)     AS v1_canceled_trial,
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL AND s.user_id IS NULL) AS v1_canceled_active,
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NULL AND s.user_id IS NOT NULL)     AS v2_canceled_trial,
-          COUNT(*) FILTER (WHERE sub.status = 'canceled' AND sub.subscribed_at IS NOT NULL AND s.user_id IS NOT NULL) AS v2_canceled_active
+          COUNT(*) FILTER (WHERE ${TRIAL_CANCEL} AND s.user_id IS NULL)     AS v1_canceled_trial,
+          COUNT(*) FILTER (WHERE ${PAID_CANCEL}  AND s.user_id IS NULL)     AS v1_canceled_active,
+          COUNT(*) FILTER (WHERE ${TRIAL_CANCEL} AND s.user_id IS NOT NULL) AS v2_canceled_trial,
+          COUNT(*) FILTER (WHERE ${PAID_CANCEL}  AND s.user_id IS NOT NULL) AS v2_canceled_active
         FROM companies
         JOIN LATERAL (
           SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
