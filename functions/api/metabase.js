@@ -655,8 +655,11 @@ export async function onRequest(context) {
         SELECT period::text, source,
           COUNT(*) FILTER (WHERE step_num >= 1) AS signups,
           -- NOTE: the key is still called "stripe" for backwards compatibility with
-          -- index.html, but since the 2026-08-27 paywall move step 7 means
-          -- "in the app, no card yet" (state completed or moved_to_stripe).
+          -- index.html. Step 7 means "finished the onboarding flow, no card yet".
+          -- It holds two populations that never overlap in time: until 2026-08-26
+          -- it is moved_to_stripe (stopped AT the Stripe checkout, never entered
+          -- the app); from 2026-08-27 it is completed-without-card (inside the
+          -- app, paywall not reached yet). Hence the neutral label in the UI.
           COUNT(*) FILTER (WHERE step_num >= 7) AS stripe,
           COUNT(*) FILTER (WHERE step_num >= 8) AS trialing,
           COUNT(*) FILTER (WHERE step_num >= 9) AS active
