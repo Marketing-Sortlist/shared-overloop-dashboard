@@ -75,6 +75,27 @@ const EVER_ACTIVE = `
 // cancel_at_period_end=true until the period ends, then becomes 'canceled'. Count
 // both states so cancellations are captured at request time. No double-count:
 // one subscription row per company, so a contact is in exactly one state.
+// PAYWALL: did this contact ever pass the card wall?
+//
+// PRODUCT CHANGE 2026-08-27: the paywall moved to AFTER onboarding. Until the
+// 26th, reaching onboarding_v2_sessions.state='completed' required entering a
+// card, so 'completed' was the trial marker. From the 27th a contact can reach
+// 'completed' (and the app) with no card and no Stripe subscription.
+//
+// The durable marker is onboarding_v2_sessions.stripe_checkout_session_id: it
+// is set when the contact goes through Stripe checkout and it SURVIVES
+// cancellation, unlike subscriptions.stripe_id which is nulled on cancel.
+// Verified on 2026-08-28: for every company created since 2026-06-01, having
+// state='completed' and having a checkout session matched 1:1 until the 26th,
+// so this definition reproduces the old funnel exactly on historical data.
+// The extra OR clauses are defence in case the new in-app paywall records the
+// subscription without writing a checkout session id.
+const PAYWALL = (ob) => `(
+  ${ob}.stripe_checkout_session_id IS NOT NULL
+  OR sub.stripe_id IS NOT NULL
+  OR sub.subscribed_at IS NOT NULL
+  OR sub.status IN ('active','past_due','unpaid'))`;
+
 const IS_CANCELED = `(sub.status = 'canceled' OR sub.cancel_at_period_end = true)`;
 
 // Split of IS_CANCELED into never-paid vs was-paying, accounting for the
@@ -111,8 +132,10 @@ const STEP_CASE = `
 const INTERNAL_FILTER = `
   AND u.email NOT ILIKE '%sortlist.com%'
   AND u.email NOT ILIKE '%overloop%'
+  AND u.email NOT ILIKE '%yourmax%'
   AND companies.name NOT ILIKE '%sortlist%'
   AND companies.name NOT ILIKE '%overloop%'
+  AND companies.name NOT ILIKE '%yourmax%'
 `;
 
 const V1_ONLY_FILTER = `
@@ -495,6 +518,7 @@ export async function onRequest(context) {
         JOIN LATERAL (
           SELECT * FROM onboarding_v2_sessions
           WHERE user_id = u.id AND state = 'completed'
+            AND stripe_checkout_session_id IS NOT NULL
           ORDER BY updated_at DESC LIMIT 1
         ) sc ON true
         LEFT JOIN LATERAL (
@@ -541,8 +565,9 @@ export async function onRequest(context) {
     const V2_STEP = `
       CASE
         WHEN ${EVER_ACTIVE}                        THEN 9
-        WHEN s.state = 'completed'                 THEN 8
-        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN ${PAYWALL('s')}                       THEN 8
+        WHEN s.state IN ('completed',
+                         'moved_to_stripe')        THEN 7
         WHEN s.state = 'sequence_accepted'         THEN 6
         WHEN s.state = 'channels_accepted'         THEN 5
         WHEN s.state = 'icp_accepted'              THEN 4
@@ -629,6 +654,12 @@ export async function onRequest(context) {
         )
         SELECT period::text, source,
           COUNT(*) FILTER (WHERE step_num >= 1) AS signups,
+          -- NOTE: the key is still called "stripe" for backwards compatibility with
+          -- index.html. Step 7 means "finished the onboarding flow, no card yet".
+          -- It holds two populations that never overlap in time: until 2026-08-26
+          -- it is moved_to_stripe (stopped AT the Stripe checkout, never entered
+          -- the app); from 2026-08-27 it is completed-without-card (inside the
+          -- app, paywall not reached yet). Hence the neutral label in the UI.
           COUNT(*) FILTER (WHERE step_num >= 7) AS stripe,
           COUNT(*) FILTER (WHERE step_num >= 8) AS trialing,
           COUNT(*) FILTER (WHERE step_num >= 9) AS active
@@ -790,6 +821,7 @@ export async function onRequest(context) {
           ) sub ON true
           LEFT JOIN LATERAL (
             SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id AND state = 'completed'
+              AND stripe_checkout_session_id IS NOT NULL
             ORDER BY updated_at DESC LIMIT 1
           ) sc ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
@@ -805,6 +837,7 @@ export async function onRequest(context) {
           ) u ON true
           JOIN LATERAL (
             SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id AND state = 'completed'
+              AND stripe_checkout_session_id IS NOT NULL
             ORDER BY updated_at DESC LIMIT 1
           ) sc ON true
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
@@ -835,7 +868,7 @@ export async function onRequest(context) {
           COUNT(*) FILTER (WHERE s.user_id IS NULL)                                                          AS v1_signups,
           COUNT(*) FILTER (WHERE s.user_id IS NOT NULL)                                                      AS v2_signups,
           COUNT(*) FILTER (WHERE sub.status = 'trialing' AND s.user_id IS NULL)                             AS v1_trialing,
-          COUNT(*) FILTER (WHERE s.state = 'completed')                                                      AS v2_trialing,
+          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL AND ${PAYWALL('s')})                                  AS v2_trialing,
           COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)                               AS v1_active,
           COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL)                           AS v2_active,
           COUNT(*) FILTER (WHERE ${TRIAL_CANCEL} AND s.user_id IS NULL)     AS v1_canceled_trial,

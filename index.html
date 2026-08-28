@@ -355,6 +355,19 @@
   <div id="funnel-v2-panel" class="funnel-panel active">
     <div class="section-card">
       <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
+      <p class="data-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
+      Until 26 Aug, reaching the end of onboarding required entering a card, so "onboarding done" and "trial started"
+      were the same moment. From 27 Aug a contact finishes onboarding and gets into the app with no card, and hits the
+      paywall later, when they try to start the trial.
+      <br><br>
+      <strong>Step 8 (Trial) is comparable across that date</strong>: it means "passed the paywall" both before and after,
+      keyed on the Stripe checkout session, which survives cancellation. Steps 1 to 6 and step 9 are unchanged too.
+      <strong>Step 7 is not a trend line across 27 Aug</strong>: before that date it holds contacts stopped AT the Stripe
+      checkout who never entered the app, and after it, contacts inside the app with no card. The two never overlap in
+      time, so it is a clean handover on a known date rather than a mixture.
+      <br><br>
+      Practical consequence: any movement in <strong>Signup&rarr;Trial</strong> from the week of 31 Aug is driven by the
+      paywall move, not by the ad campaigns that started that same week.</p>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
@@ -1533,8 +1546,8 @@ function renderFunnelV2Steps() {
     { label: 'Step 4 — ICP Accepted',        val: steps[3], idx: 3 },
     { label: 'Step 5 — Channels Accepted',   val: steps[4], idx: 4 },
     { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
-    { label: 'Step 7 — Moved to Stripe',     val: steps[6], idx: 6 },
-    { label: 'Step 8 — Trialing',            val: steps[7], idx: 7 },
+    { label: 'Step 7 — Onboarding done, no card', val: steps[6], idx: 6 },
+    { label: 'Step 8 — Trial (card in)',     val: steps[7], idx: 7 },
     { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
   ];
 
@@ -1586,7 +1599,7 @@ function renderSourceGridV2() {
 
   const fbs = mb.funnel_v2_by_source;
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
+  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
 
   el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
   el.innerHTML = srcKeys.map(key => {
@@ -1623,7 +1636,7 @@ function renderDeviceGridV2() {
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
   const DEVICE_COLOR = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' };
-  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
+  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
 
   el.innerHTML = Object.entries(fbd).sort((a,b)=>(b[1][0]||0)-(a[1][0]||0)).map(([device, vals]) => {
     const color = DEVICE_COLOR[device] || '#94a3b8';
@@ -1680,7 +1693,7 @@ function renderSourceTableV2() {
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Source</th><th>Signups</th><th>Stripe</th><th>Trialing</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>Stripe→Trial</th><th>Signup→Active</th>
+      <th>Source</th><th>Signups</th><th>No card</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>No card→Trial</th><th>Signup→Active</th>
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>`;
@@ -1821,7 +1834,7 @@ function renderFunnelCompare() {
 
   const rows = [
     { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
-    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
+    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
     { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
     { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
     { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
