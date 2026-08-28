@@ -1533,8 +1533,8 @@ function renderFunnelV2Steps() {
     { label: 'Step 4 — ICP Accepted',        val: steps[3], idx: 3 },
     { label: 'Step 5 — Channels Accepted',   val: steps[4], idx: 4 },
     { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
-    { label: 'Step 7 — Moved to Stripe',     val: steps[6], idx: 6 },
-    { label: 'Step 8 — Trialing',            val: steps[7], idx: 7 },
+    { label: 'Step 7 — In app, no card',     val: steps[6], idx: 6 },
+    { label: 'Step 8 — Trial (card in)',     val: steps[7], idx: 7 },
     { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
   ];
 
@@ -1586,7 +1586,7 @@ function renderSourceGridV2() {
 
   const fbs = mb.funnel_v2_by_source;
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
+  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','In app, no card','Trial (card in)','Active'];
 
   el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
   el.innerHTML = srcKeys.map(key => {
@@ -1623,7 +1623,7 @@ function renderDeviceGridV2() {
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
   const DEVICE_COLOR = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' };
-  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Moved to Stripe','Trialing','Active'];
+  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','In app, no card','Trial (card in)','Active'];
 
   el.innerHTML = Object.entries(fbd).sort((a,b)=>(b[1][0]||0)-(a[1][0]||0)).map(([device, vals]) => {
     const color = DEVICE_COLOR[device] || '#94a3b8';
@@ -1680,7 +1680,7 @@ function renderSourceTableV2() {
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Source</th><th>Signups</th><th>Stripe</th><th>Trialing</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>Stripe→Trial</th><th>Signup→Active</th>
+      <th>Source</th><th>Signups</th><th>In app</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>In app→Trial</th><th>Signup→Active</th>
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>`;
@@ -1821,7 +1821,7 @@ function renderFunnelCompare() {
 
   const rows = [
     { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
-    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: onboarding_v2_state = completed' },
+    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
     { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
     { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
     { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
