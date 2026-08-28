@@ -355,6 +355,19 @@
   <div id="funnel-v2-panel" class="funnel-panel active">
     <div class="section-card">
       <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
+      <p class="data-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
+      Until 26 Aug, reaching the end of onboarding required entering a card, so "onboarding done" and "trial started"
+      were the same moment. From 27 Aug a contact finishes onboarding and gets into the app with no card, and hits the
+      paywall later, when they try to start the trial.
+      <br><br>
+      <strong>Step 8 (Trial) is comparable across that date</strong>: it means "passed the paywall" both before and after,
+      keyed on the Stripe checkout session, which survives cancellation. Steps 1 to 6 and step 9 are unchanged too.
+      <strong>Step 7 is not a trend line across 27 Aug</strong>: before that date it holds contacts stopped AT the Stripe
+      checkout who never entered the app, and after it, contacts inside the app with no card. The two never overlap in
+      time, so it is a clean handover on a known date rather than a mixture.
+      <br><br>
+      Practical consequence: any movement in <strong>Signup&rarr;Trial</strong> from the week of 31 Aug is driven by the
+      paywall move, not by the ad campaigns that started that same week.</p>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
