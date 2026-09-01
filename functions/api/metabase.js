@@ -247,6 +247,34 @@ export async function onRequest(context) {
       }));
     } catch (_) {}
 
+    // Signups per ad and per ad set, straight from the UTMs the ads carry:
+    // utm_content is the ad id and utm_term the ad set id. Lets the weekly report
+    // build the format and audience CAC splits from Metabase rows instead of
+    // Meta's attributed lead count, which over-reported by 61% while
+    // browser/server deduplication was broken.
+    let signups_by_ad = [];
+    try {
+      const sigAdRows = await runSQL(env, `
+        SELECT
+          ${SOURCE_CASE} AS source,
+          substring(companies.signup_url, 'utm_term=([^&]*)')    AS adset_id,
+          substring(companies.signup_url, 'utm_content=([^&]*)') AS ad_id,
+          COUNT(DISTINCT u.email) AS cnt
+        FROM companies
+        JOIN LATERAL (
+          SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+        ) u ON true
+        WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          AND companies.signup_url ~ 'utm_content='
+        ${INTERNAL_FILTER}
+        GROUP BY 1, 2, 3
+        ORDER BY 4 DESC
+      `);
+      signups_by_ad = sigAdRows.map(([source, adset_id, ad_id, cnt]) => ({
+        source, adset_id, ad_id, signups: parseInt(cnt) || 0,
+      }));
+    } catch (_) {}
+
     // 1c. Trials by source + utm_campaign — V1 only (V2 part merged after V2_BASE/V2_STEP are defined)
     const tCampMap = {};
     try {
@@ -977,6 +1005,7 @@ export async function onRequest(context) {
       granularity,
       signups_daily,
       signups_by_campaign,
+      signups_by_ad,
       trials_by_campaign,
       trials_daily,
       activations_daily,
