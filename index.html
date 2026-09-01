@@ -1548,9 +1548,15 @@ function renderTables() {
     mEl.innerHTML = '<p class="no-data">No data</p>';
   } else {
     const rows = (meta.campaigns || []).filter(c => c.spend > 0).map(c => {
+      // Prefer the utm_campaign values read off the campaign's own ads: the
+      // hardcoded map went stale on the 31 Aug relaunch and showed ~1,000 EUR of
+      // spend against zero signups. The map stays as a fallback for campaigns
+      // whose ads no longer carry a readable UTM.
+      const utms  = c.utm_campaigns || [];
       const entry = META_CAMPAIGN_MAP.find(m => m.name === c.name);
-      const matchFn = entry
-        ? (entry.matchFn || (u => u === entry.utm))
+      const matchFn = utms.length
+        ? (u => utms.includes(u))
+        : entry ? (entry.matchFn || (u => u === entry.utm))
         : (u => false);
       const sigs = sumCampaignMetric(sigsByCamp, 'meta', matchFn, 'signups');
       const trls = sumCampaignMetric(trlsByCamp, 'meta', matchFn, 'trials');
@@ -1567,7 +1573,10 @@ function renderTables() {
     });
     mEl.innerHTML = `<table><thead><tr>
       <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
-    </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    </tr></thead><tbody>${rows.join('')}</tbody></table>
+    <p class="data-note" style="margin-top:10px">Spend from Meta, signups and trials from Metabase, joined on
+    <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups and CPL spend ÷ trials, so neither
+    uses Meta's attributed conversion count.</p>`;
   }
 
   // ── Google table ──
