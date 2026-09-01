@@ -366,6 +366,36 @@
       </div>
       <div id="funnel-v21-steps"><div class="loading"><div class="spinner"></div></div></div>
     </div>
+    <div class="section-card">
+      <h3 class="collapsible-hdr" onclick="toggleSection('source-grid-v21-wrap','buckets-ch-v21-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2.1 — Leaking Buckets by Channel
+        <span id="buckets-ch-v21-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="source-grid-v21-wrap" style="display:none">
+        <div class="source-grid" id="source-grid-v21">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-card">
+      <h3 class="collapsible-hdr" onclick="toggleSection('device-grid-v21-wrap','buckets-dev-v21-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2.1 — Leaking Buckets by Device
+        <span id="buckets-dev-v21-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="device-grid-v21-wrap" style="display:none">
+        <div id="device-grid-v21" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-card" style="overflow-x:auto">
+      <h3>Onboarding v2.1 — Channel Breakdown Table</h3>
+      <div id="source-table-v21"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3>Onboarding v2.1 — Trial Behaviour</h3>
+      <div id="trial-behavior-v21"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
   </div>
 
   <!-- ── V2 Panel ── -->
@@ -410,11 +440,7 @@
       <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
-      <h3>Conversion Rates Over Time — all v2 sessions (v2 and v2.1)</h3>
-      <canvas id="v2-conversion-chart" height="90"></canvas>
-    </div>
-    <div class="section-card">
-      <h3>Trial Behaviour — all v2 sessions (v2 and v2.1)</h3>
+      <h3>Onboarding v2 — Trial Behaviour</h3>
       <div id="trial-behavior-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
@@ -460,6 +486,14 @@
         <div class="filter-row"><span class="filter-label">Device</span><div id="compare-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
       </div>
       <div id="funnel-compare"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3>Conversion Rates Over Time — across the v2.1 release</h3>
+      <p class="data-note">One continuous line on purpose, not split by cohort. The two cohorts are sequential in time, so
+      splitting would cut one series in half at 27 Aug rather than give two comparable ones. Step 8 (Trial) is keyed on the
+      Stripe checkout session, which means the same thing on both sides of the release, so the trend is readable straight
+      through it. The annotation marks the release.</p>
+      <canvas id="v2-conversion-chart" height="90"></canvas>
     </div>
   </div>
 </main>
@@ -997,11 +1031,13 @@ async function loadAll() {
   renderSignupsChart();
   renderTables();
   renderFunnelV2Steps();
-  renderSourceGridV2();
-  renderDeviceGridV2();
-  renderSourceTableV2();
+  for (const c of ['v2', 'v2.1']) {
+    renderSourceGridV2(c);
+    renderDeviceGridV2(c);
+    renderSourceTableV2(c);
+    renderTrialBehaviorV2(c);
+  }
   renderV2ConversionChart();
-  renderTrialBehaviorV2();
   renderFunnelSteps();
   renderSourceGrid();
   renderDeviceGrid();
@@ -1702,12 +1738,13 @@ function renderFunnelV2Steps() {
   renderV2Funnel('v2');
 }
 
-function renderSourceGridV2() {
+function renderSourceGridV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('source-grid-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'source-grid-v21' : 'source-grid-v2');
+  if (!el) return;
   if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const fbs = v2Breakdown('v2', 'source');
+  const fbs = v2Breakdown(cohort, 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
   const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
 
@@ -1737,11 +1774,11 @@ function renderSourceGridV2() {
   }).join('');
 }
 
-function renderDeviceGridV2() {
+function renderDeviceGridV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('device-grid-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'device-grid-v21' : 'device-grid-v2');
   if (!el) return;
-  const fbd = v2Breakdown('v2', 'device');
+  const fbd = v2Breakdown(cohort, 'device');
   if (!fbd || Object.keys(fbd).length === 0) { el.innerHTML = '<p class="no-data">No device data</p>'; return; }
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
@@ -1770,12 +1807,13 @@ function renderDeviceGridV2() {
   }).join('');
 }
 
-function renderSourceTableV2() {
+function renderSourceTableV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('source-table-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'source-table-v21' : 'source-table-v2');
+  if (!el) return;
   if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const fbs     = v2Breakdown('v2', 'source');
+  const fbs     = v2Breakdown(cohort, 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
 
   const rows = srcKeys.map(key => {
@@ -1876,11 +1914,11 @@ function renderV2ConversionChart() {
   }
 }
 
-function renderTrialBehaviorV2() {
+function renderTrialBehaviorV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('trial-behavior-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'trial-behavior-v21' : 'trial-behavior-v2');
   if (!el) return;
-  const tb = mb?.trial_behavior_v2;
+  const tb = mb?.trial_behavior_v2_by_cohort?.[cohort] || mb?.trial_behavior_v2;
   if (!tb) { el.innerHTML = '<p class="no-data">No data yet — trial behaviour populates once v2 users have been in trial for some time</p>'; return; }
 
   const fmtDays = v => v != null ? parseFloat(v).toFixed(1) + ' days' : '–';

@@ -803,10 +803,12 @@ export async function onRequest(context) {
 
     // 8d. V2 trial behaviour (trial_start = onboarding_v2_sessions.updated_at when completed)
     let trial_behavior_v2 = null;
+    const trial_behavior_v2_by_cohort = {};
     try {
       const [tbV2Rows, tbV2SrcRows] = await Promise.all([
         runSQL(env, `
           SELECT
+            ${COHORT_CASE('f')} AS cohort,
             ROUND(AVG(EXTRACT(EPOCH FROM (sc.updated_at - companies.created_at)) / 86400)::numeric, 1)
               AS avg_days_signup_to_trial,
             ROUND(AVG(EXTRACT(EPOCH FROM (sub.subscribed_at - sc.updated_at)) / 86400)
@@ -840,8 +842,10 @@ export async function onRequest(context) {
               AND stripe_checkout_session_id IS NOT NULL
             ORDER BY updated_at DESC LIMIT 1
           ) sc ON true
+          ${FIRST_SESSION_JOIN}
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
           ${INTERNAL_FILTER}
+          GROUP BY GROUPING SETS ((1), ())
         `),
         runSQL(env, `
           SELECT ${SOURCE_CASE} AS source,
@@ -861,18 +865,22 @@ export async function onRequest(context) {
           GROUP BY 1 ORDER BY 2
         `),
       ]);
-      if (tbV2Rows[0]) {
-        const [avg_s2t, avg_t2a, over14, in14, canceled_in14] = tbV2Rows[0];
-        const avg_signup_to_trial_by_source = {};
-        for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
-        trial_behavior_v2 = {
-          avg_days_signup_to_trial:  avg_s2t != null ? Number(avg_s2t) : null,
-          avg_days_trial_to_active:  avg_t2a != null ? Number(avg_t2a) : null,
-          over_14d_not_active:       Number(over14) || 0,
-          in_14d_window:             Number(in14)   || 0,
-          canceled_in_14d_window:    Number(canceled_in14) || 0,
-          avg_signup_to_trial_by_source,
-        };
+      // GROUPING SETS gives one row per cohort plus a grand-total row (cohort NULL),
+      // so the per-tab numbers and the back-compat all-cohorts object come from a
+      // single query rather than two.
+      const avg_signup_to_trial_by_source = {};
+      for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
+      const shape = ([, avg_s2t, avg_t2a, over14, in14, canceled_in14]) => ({
+        avg_days_signup_to_trial: avg_s2t != null ? Number(avg_s2t) : null,
+        avg_days_trial_to_active: avg_t2a != null ? Number(avg_t2a) : null,
+        over_14d_not_active:      Number(over14) || 0,
+        in_14d_window:            Number(in14)   || 0,
+        canceled_in_14d_window:   Number(canceled_in14) || 0,
+        avg_signup_to_trial_by_source,
+      });
+      for (const row of tbV2Rows) {
+        if (row[0] == null) trial_behavior_v2 = shape(row);
+        else trial_behavior_v2_by_cohort[row[0]] = shape(row);
       }
     } catch (e) { trial_behavior_v2 = null; }
 
@@ -989,6 +997,7 @@ export async function onRequest(context) {
       cancellations_daily,
       cancellations_v2_daily,
       trial_behavior_v2,
+      trial_behavior_v2_by_cohort,
       canceled_trial_stats,
       compare,
       compare_cube,
