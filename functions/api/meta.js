@@ -25,6 +25,54 @@ function timeRange(since, until) {
   return encodeURIComponent(JSON.stringify({ since, until }));
 }
 
+
+// ── utm_campaign discovery ─────────────────────────────────────────────────
+//
+// The Performance table pairs Meta SPEND with Metabase SIGNUPS, and the join key
+// is utm_campaign. That mapping used to be a hardcoded list of campaign names in
+// index.html, which silently broke on the 31 Aug relaunch: the three live
+// campaigns were not in the list, so the table showed ~1,000 EUR of spend against
+// zero signups and no CAC. Deriving it from the ads themselves cannot go stale.
+//
+// Two shapes to read, because only the 2026 relaunch uses url_tags:
+//   url_tags: "utm_source=facebook&...&utm_campaign=acq_try_now-usen"
+//   the link itself: "https://overloop.com/try-now?...&utm_campaign=conversion_..."
+function utmFrom(str) {
+  if (!str) return null;
+  const m = /[?&]?utm_campaign=([^&\s]+)/i.exec(str);
+  return m ? decodeURIComponent(m[1]).toLowerCase() : null;
+}
+
+function linksOf(creative) {
+  if (!creative) return [];
+  const oss = creative.object_story_spec || {};
+  const data = oss.link_data || oss.video_data || {};
+  return [
+    creative.url_tags,
+    data.link,
+    data.call_to_action?.value?.link,
+    ...((creative.asset_feed_spec?.link_urls || []).map(l => l.website_url)),
+  ].filter(Boolean);
+}
+
+async function utmByCampaign(base, accountId, token) {
+  const map = {};
+  try {
+    const fields = 'campaign_id,creative{url_tags,object_story_spec,asset_feed_spec}';
+    const res = await fetchJson(
+      `${base}/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=500&access_token=${token}`
+    );
+    for (const ad of res.data || []) {
+      for (const str of linksOf(ad.creative)) {
+        const utm = utmFrom(str);
+        if (!utm) continue;
+        (map[ad.campaign_id] ||= new Set()).add(utm);
+      }
+    }
+  } catch (_) { /* the table falls back to its hardcoded map */ }
+  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, [...v]]));
+}
+
 export async function onRequest(context) {
   const { env, request } = context;
   const url = new URL(request.url);
@@ -64,10 +112,16 @@ export async function onRequest(context) {
         ctr: parseFloat(d.ctr || 0),
         cpm: parseFloat(d.cpm || 0),
         cpc: parseFloat(d.cpc || 0),
-        leads: parseInt(cLeads),
-        cpl: cLeads > 0 ? cSpend / cLeads : 0,
+        // Meta's OWN attributed lead count, kept for reference only. The number
+        // to report is Metabase signups joined on utm_campaign: Meta over-counted
+        // by 61% while browser/server deduplication was broken.
+        leads_meta_reported: parseInt(cLeads),
+        cpl_meta_reported: cLeads > 0 ? cSpend / cLeads : 0,
       };
     });
+
+    const utmMap = await utmByCampaign(BASE, accountId, token);
+    for (const c of campaignInsights) c.utm_campaigns = utmMap[c.id] || [];
 
     const dailyData = await fetchJson(
       `${BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions&time_range=${tr}&time_increment=1&limit=500&${attrWindows}&access_token=${token}`
@@ -77,7 +131,7 @@ export async function onRequest(context) {
       spend: parseFloat(d.spend || 0),
       impressions: parseInt(d.impressions || 0),
       clicks: parseInt(d.clicks || 0),
-      leads: parseInt((d.actions || []).find(a => a.action_type === 'lead')?.value || 0),
+      leads_meta_reported: parseInt((d.actions || []).find(a => a.action_type === 'lead')?.value || 0),
     }));
 
     return Response.json({
@@ -88,8 +142,8 @@ export async function onRequest(context) {
         ctr: parseFloat(acc.ctr || 0),
         cpm: parseFloat(acc.cpm || 0),
         cpc: parseFloat(acc.cpc || 0),
-        leads: parseInt(leads),
-        cpl: leads > 0 ? spend / leads : 0,
+        leads_meta_reported: parseInt(leads),
+        cpl_meta_reported: leads > 0 ? spend / leads : 0,
       },
       campaigns: campaignInsights,
       daily,

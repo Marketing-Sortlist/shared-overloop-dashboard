@@ -142,6 +142,46 @@ const V1_ONLY_FILTER = `
   AND NOT EXISTS (SELECT 1 FROM onboarding_v2_sessions WHERE onboarding_v2_sessions.user_id = u.id)
 `;
 
+// ── Onboarding cohorts ─────────────────────────────────────────────────────
+//
+// Onboarding v2.1 = the frontend release of 2026-08-27 14:00, which moved the
+// paywall to after onboarding. It is not a new onboarding, it is v2 with that
+// release on top, so it lives as a third cohort rather than a third funnel.
+const V21_CUTOFF = '2026-08-27 14:00';
+
+// Keyed on the FIRST v2 session, never the latest. A contact who signed up in
+// January and reopened onboarding after the cutoff saw v2 the first time round,
+// so they belong to v2. Cutting on the latest session dragged 70 such contacts
+// into v2.1, some with signups going back to 7 Jan.
+const COHORT_CASE = (f) => `
+  CASE
+    WHEN ${f}.user_id IS NULL                  THEN 'legacy'
+    WHEN ${f}.created_at < '${V21_CUTOFF}'     THEN 'v2'
+    ELSE                                            'v2.1'
+  END`;
+
+const FIRST_SESSION_JOIN = `
+  LEFT JOIN LATERAL (
+    SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id ORDER BY created_at ASC LIMIT 1
+  ) f ON true`;
+
+const DEVICE_CASE = `
+  CASE
+    WHEN COALESCE(companies.signup_user_agent, '') ~* '(mobile|android|iphone)' THEN 'mobile'
+    WHEN COALESCE(companies.signup_user_agent, '') ~* '(ipad|tablet)'           THEN 'tablet'
+    WHEN companies.signup_user_agent IS NOT NULL
+         AND companies.signup_user_agent <> ''                                 THEN 'desktop'
+    ELSE 'unknown'
+  END`;
+
+// Legacy benchmark window, deliberately pinned and NOT driven by the date picker.
+// Legacy was 100% of signups in Feb and Mar 2026 and 72.7% in Apr; from May on it
+// is a residual tail of 7 to 20 a month, so inside a recent window the column is
+// noise (n=9) rather than a population. April is included because signup_user_agent
+// only starts being populated then: 77.2% of Feb+Mar has no device, so without April
+// the device filter would leave the column at 141 of 650 with no way to notice.
+const LEGACY_WINDOW = { since: '2026-02-01', until: '2026-05-01' };
+
 function buildPeriodMap(rows) {
   const map = {};
   for (const [period, source, cnt] of rows) {
@@ -207,6 +247,34 @@ export async function onRequest(context) {
       }));
     } catch (_) {}
 
+    // Signups per ad and per ad set, straight from the UTMs the ads carry:
+    // utm_content is the ad id and utm_term the ad set id. Lets the weekly report
+    // build the format and audience CAC splits from Metabase rows instead of
+    // Meta's attributed lead count, which over-reported by 61% while
+    // browser/server deduplication was broken.
+    let signups_by_ad = [];
+    try {
+      const sigAdRows = await runSQL(env, `
+        SELECT
+          ${SOURCE_CASE} AS source,
+          substring(companies.signup_url, 'utm_term=([^&]*)')    AS adset_id,
+          substring(companies.signup_url, 'utm_content=([^&]*)') AS ad_id,
+          COUNT(DISTINCT u.email) AS cnt
+        FROM companies
+        JOIN LATERAL (
+          SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+        ) u ON true
+        WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          AND companies.signup_url ~ 'utm_content='
+        ${INTERNAL_FILTER}
+        GROUP BY 1, 2, 3
+        ORDER BY 4 DESC
+      `);
+      signups_by_ad = sigAdRows.map(([source, adset_id, ad_id, cnt]) => ({
+        source, adset_id, ad_id, signups: parseInt(cnt) || 0,
+      }));
+    } catch (_) {}
+
     // 1c. Trials by source + utm_campaign — V1 only (V2 part merged after V2_BASE/V2_STEP are defined)
     const tCampMap = {};
     try {
@@ -244,12 +312,14 @@ export async function onRequest(context) {
       }
     } catch (_) {}
 
-    // 2. Funnel
+    // 2. Funnel — one cube by (source, device), same reason as the v2 one below:
+    // two separate 1-D breakdowns cannot be intersected.
     const funnelRows = await runSQL(env, `
       WITH raw AS (
         SELECT
           u.email,
           ${SOURCE_CASE} AS source,
+          ${DEVICE_CASE} AS device,
           ${STEP_CASE} AS step_num
         FROM companies
         LEFT JOIN LATERAL (
@@ -263,11 +333,12 @@ export async function onRequest(context) {
         ${V1_ONLY_FILTER}
       ),
       deduped AS (
-        SELECT DISTINCT ON (email) email, source, step_num
+        SELECT DISTINCT ON (email) email, source, device, step_num
         FROM raw ORDER BY email, step_num DESC
       )
       SELECT
         source,
+        device,
         COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
         COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
         COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
@@ -278,67 +349,24 @@ export async function onRequest(context) {
         COUNT(*) FILTER (WHERE step_num >= 8) AS s8,
         COUNT(*) FILTER (WHERE step_num >= 9) AS s9
       FROM deduped
-      GROUP BY source
+      GROUP BY source, device
     `);
 
     const funnelBySource = {};
+    const funnelByDevice = {};
+    const funnel_cube = [];
     const totalsFinal = Array(9).fill(0);
-    for (const [source, ...counts] of funnelRows) {
+    for (const [source, device, ...counts] of funnelRows) {
+      const steps = counts.map(Number);
+      funnel_cube.push({ source, device, steps });
       if (!funnelBySource[source]) funnelBySource[source] = Array(9).fill(0);
-      counts.forEach((v, i) => {
-        funnelBySource[source][i] += Number(v);
-        totalsFinal[i] += Number(v);
+      if (!funnelByDevice[device]) funnelByDevice[device] = Array(9).fill(0);
+      steps.forEach((v, i) => {
+        funnelBySource[source][i] += v;
+        funnelByDevice[device][i] += v;
+        totalsFinal[i] += v;
       });
     }
-
-    // 3. Funnel by device type
-    let funnelByDevice = {};
-    try {
-      const deviceRows = await runSQL(env, `
-        WITH raw AS (
-          SELECT
-            u.email,
-            CASE
-              WHEN COALESCE(companies.signup_user_agent, '') ~* '(mobile|android|iphone)' THEN 'mobile'
-              WHEN COALESCE(companies.signup_user_agent, '') ~* '(ipad|tablet)' THEN 'tablet'
-              WHEN companies.signup_user_agent IS NOT NULL AND companies.signup_user_agent <> '' THEN 'desktop'
-              ELSE 'unknown'
-            END AS device,
-            ${STEP_CASE} AS step_num
-          FROM companies
-          LEFT JOIN LATERAL (
-            SELECT * FROM subscriptions WHERE subscriptions.company_id = companies.id ORDER BY id DESC LIMIT 1
-          ) sub ON true
-          JOIN LATERAL (
-            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
-          ) u ON true
-          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
-          ${INTERNAL_FILTER}
-          ${V1_ONLY_FILTER}
-        ),
-        deduped AS (
-          SELECT DISTINCT ON (email) email, device, step_num
-          FROM raw ORDER BY email, step_num DESC
-        )
-        SELECT
-          device,
-          COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
-          COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
-          COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
-          COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
-          COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
-          COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
-          COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
-          COUNT(*) FILTER (WHERE step_num >= 8) AS s8,
-          COUNT(*) FILTER (WHERE step_num >= 9) AS s9
-        FROM deduped
-        GROUP BY device
-        ORDER BY s1 DESC
-      `);
-      for (const [device, ...counts] of deviceRows) {
-        funnelByDevice[device] = counts.map(Number);
-      }
-    } catch (e) { funnelByDevice = { _error: e.message }; }
 
     // 4. Per-period funnel
     let trials_daily = [], activations_daily = [];
@@ -577,23 +605,36 @@ export async function onRequest(context) {
         ELSE 0
       END
     `;
-    const V2_COUNTS = `
-      COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
-      COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
-      COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
-      COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
-      COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
-      COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
-      COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
-      COUNT(*) FILTER (WHERE step_num >= 8) AS s8,
-      COUNT(*) FILTER (WHERE step_num >= 9) AS s9
+
+    // The measurement in force BEFORE the 2026-08-27 14:00 release. Back then,
+    // reaching state='completed' required entering a card, so 'completed' WAS the
+    // trial marker and 'moved_to_stripe' was the step below it. Kept so the
+    // Onboarding v2 tab reads that cohort the way it was read at the time,
+    // instead of retro-fitting today's paywall-based definition onto it.
+    const V2_STEP_PRE827 = `
+      CASE
+        WHEN ${EVER_ACTIVE}                        THEN 9
+        WHEN s.state = 'completed'                 THEN 8
+        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN s.state = 'sequence_accepted'         THEN 6
+        WHEN s.state = 'channels_accepted'         THEN 5
+        WHEN s.state = 'icp_accepted'              THEN 4
+        WHEN s.state = 'business_details_accepted' THEN 3
+        WHEN s.state = 'domain_provided'           THEN 2
+        WHEN s.state = 'email_confirmed'           THEN 1
+        ELSE 0
+      END
     `;
+    const V2_COUNTS_OF = (col, sfx) => [1,2,3,4,5,6,7,8,9]
+      .map(n => `COUNT(*) FILTER (WHERE ${col} >= ${n}) AS s${n}${sfx}`).join(',\n      ');
+    const V2_COUNTS = V2_COUNTS_OF('step_num', '');
     const V2_BASE = `
       FROM companies
       JOIN LATERAL (
         SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
       ) u ON true
       JOIN onboarding_v2_sessions s ON s.user_id = u.id
+      ${FIRST_SESSION_JOIN}
       LEFT JOIN LATERAL (
         SELECT * FROM subscriptions WHERE company_id = companies.id ORDER BY id DESC LIMIT 1
       ) sub ON true
@@ -602,42 +643,45 @@ export async function onRequest(context) {
     `;
 
     let funnel_v2 = { steps: Array(9).fill(0), total: 0 };
+    let funnel_v2_cube = [];
     let funnel_v2_by_source = {};
     let funnel_v2_by_device = {};
     let trials_v2_daily = [], activations_v2_daily = [];
     try {
-      const [fv2Rows, fv2DevRows] = await Promise.all([
-        runSQL(env, `
-          WITH raw AS (
-            SELECT u.email, ${SOURCE_CASE} AS source, MAX(${V2_STEP}) AS step_num
-            ${V2_BASE} GROUP BY u.email, source
-          )
-          SELECT source, ${V2_COUNTS} FROM raw GROUP BY source
-        `),
-        runSQL(env, `
-          WITH raw AS (
-            SELECT u.email,
-              CASE
-                WHEN COALESCE(companies.signup_user_agent,'') ~* '(mobile|android|iphone)' THEN 'mobile'
-                WHEN COALESCE(companies.signup_user_agent,'') ~* '(ipad|tablet)'           THEN 'tablet'
-                WHEN companies.signup_user_agent IS NOT NULL AND companies.signup_user_agent <> '' THEN 'desktop'
-                ELSE 'unknown'
-              END AS device,
-              MAX(${V2_STEP}) AS step_num
-            ${V2_BASE} GROUP BY u.email, device
-          )
-          SELECT device, ${V2_COUNTS} FROM raw GROUP BY device ORDER BY s1 DESC
-        `),
-      ]);
+      // One cube by (cohort, source, device) instead of two independent 1-D
+      // breakdowns. Two breakdowns cannot answer "meta AND desktop", which is why
+      // picking a device used to wipe the source. Cardinality is ~2x5x4 rows of
+      // nine counts, so the client aggregates over whatever is set to "all".
+      // Each row carries the funnel under BOTH measurements: `steps` is today's
+      // paywall-based definition and `steps_pre827` the one in force before the
+      // 27 Aug release. The Onboarding v2 tab reads its cohort the way it was
+      // read at the time; the v2.1 tab reads its own the way we read it now.
+      const fv2Rows = await runSQL(env, `
+        WITH raw AS (
+          SELECT u.email,
+            ${COHORT_CASE('f')}        AS cohort,
+            ${SOURCE_CASE}             AS source,
+            ${DEVICE_CASE}             AS device,
+            MAX(${V2_STEP})            AS step_num,
+            MAX(${V2_STEP_PRE827})     AS step_pre
+          ${V2_BASE} GROUP BY u.email, cohort, source, device
+        )
+        SELECT cohort, source, device,
+          ${V2_COUNTS_OF('step_num', '')},
+          ${V2_COUNTS_OF('step_pre', 'p')}
+        FROM raw GROUP BY cohort, source, device ORDER BY s1 DESC
+      `);
       const v2Totals = Array(9).fill(0);
-      for (const [source, ...counts] of fv2Rows) {
+      for (const [cohort, source, device, ...counts] of fv2Rows) {
+        const steps        = counts.slice(0, 9).map(Number);
+        const steps_pre827 = counts.slice(9, 18).map(Number);
+        funnel_v2_cube.push({ cohort, source, device, steps, steps_pre827 });
+        steps.forEach((v, i) => { v2Totals[i] += v; });
         if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(9).fill(0);
-        counts.forEach((v, i) => { funnel_v2_by_source[source][i] += Number(v); v2Totals[i] += Number(v); });
+        if (!funnel_v2_by_device[device]) funnel_v2_by_device[device] = Array(9).fill(0);
+        steps.forEach((v, i) => { funnel_v2_by_source[source][i] += v; funnel_v2_by_device[device][i] += v; });
       }
       funnel_v2 = { steps: v2Totals, total: v2Totals[0] || 0 };
-      for (const [device, ...counts] of fv2DevRows) {
-        funnel_v2_by_device[device] = counts.map(Number);
-      }
     } catch (e) { funnel_v2 = { steps: Array(9).fill(0), total: 0, _error: e.message }; }
 
     // V2 per-period trials / activations (same structure as V1 trials_daily / activations_daily)
@@ -787,10 +831,12 @@ export async function onRequest(context) {
 
     // 8d. V2 trial behaviour (trial_start = onboarding_v2_sessions.updated_at when completed)
     let trial_behavior_v2 = null;
+    const trial_behavior_v2_by_cohort = {};
     try {
       const [tbV2Rows, tbV2SrcRows] = await Promise.all([
         runSQL(env, `
           SELECT
+            ${COHORT_CASE('f')} AS cohort,
             ROUND(AVG(EXTRACT(EPOCH FROM (sc.updated_at - companies.created_at)) / 86400)::numeric, 1)
               AS avg_days_signup_to_trial,
             ROUND(AVG(EXTRACT(EPOCH FROM (sub.subscribed_at - sc.updated_at)) / 86400)
@@ -824,8 +870,10 @@ export async function onRequest(context) {
               AND stripe_checkout_session_id IS NOT NULL
             ORDER BY updated_at DESC LIMIT 1
           ) sc ON true
+          ${FIRST_SESSION_JOIN}
           WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
           ${INTERNAL_FILTER}
+          GROUP BY GROUPING SETS ((1), ())
         `),
         runSQL(env, `
           SELECT ${SOURCE_CASE} AS source,
@@ -845,36 +893,35 @@ export async function onRequest(context) {
           GROUP BY 1 ORDER BY 2
         `),
       ]);
-      if (tbV2Rows[0]) {
-        const [avg_s2t, avg_t2a, over14, in14, canceled_in14] = tbV2Rows[0];
-        const avg_signup_to_trial_by_source = {};
-        for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
-        trial_behavior_v2 = {
-          avg_days_signup_to_trial:  avg_s2t != null ? Number(avg_s2t) : null,
-          avg_days_trial_to_active:  avg_t2a != null ? Number(avg_t2a) : null,
-          over_14d_not_active:       Number(over14) || 0,
-          in_14d_window:             Number(in14)   || 0,
-          canceled_in_14d_window:    Number(canceled_in14) || 0,
-          avg_signup_to_trial_by_source,
-        };
+      // GROUPING SETS gives one row per cohort plus a grand-total row (cohort NULL),
+      // so the per-tab numbers and the back-compat all-cohorts object come from a
+      // single query rather than two.
+      const avg_signup_to_trial_by_source = {};
+      for (const [src, avg] of tbV2SrcRows) avg_signup_to_trial_by_source[src] = avg != null ? Number(avg) : null;
+      const shape = ([, avg_s2t, avg_t2a, over14, in14, canceled_in14]) => ({
+        avg_days_signup_to_trial: avg_s2t != null ? Number(avg_s2t) : null,
+        avg_days_trial_to_active: avg_t2a != null ? Number(avg_t2a) : null,
+        over_14d_not_active:      Number(over14) || 0,
+        in_14d_window:            Number(in14)   || 0,
+        canceled_in_14d_window:   Number(canceled_in14) || 0,
+        avg_signup_to_trial_by_source,
+      });
+      for (const row of tbV2Rows) {
+        if (row[0] == null) trial_behavior_v2 = shape(row);
+        else trial_behavior_v2_by_cohort[row[0]] = shape(row);
       }
     } catch (e) { trial_behavior_v2 = null; }
 
-    // 8c. Compare: V1 vs V2 signup / trialing / active within date range
+    // 8c. Compare cube: legacy / v2 / v2.1 by (source, device).
+    //
+    // Two queries on purpose. v2 and v2.1 follow the date picker; legacy is pinned
+    // to LEGACY_WINDOW, because inside a recent window legacy is a residual tail
+    // (n=9 in the last 14 days) rather than a comparable population. The header
+    // states the window, so the columns not sharing a period is explicit.
+    let compare_cube = [];
     let compare = null;
     try {
-      const cmpRows = await runSQL(env, `
-        SELECT
-          COUNT(*) FILTER (WHERE s.user_id IS NULL)                                                          AS v1_signups,
-          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL)                                                      AS v2_signups,
-          COUNT(*) FILTER (WHERE sub.status = 'trialing' AND s.user_id IS NULL)                             AS v1_trialing,
-          COUNT(*) FILTER (WHERE s.user_id IS NOT NULL AND ${PAYWALL('s')})                                  AS v2_trialing,
-          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NULL)                               AS v1_active,
-          COUNT(*) FILTER (WHERE sub.status = 'active' AND s.user_id IS NOT NULL)                           AS v2_active,
-          COUNT(*) FILTER (WHERE ${TRIAL_CANCEL} AND s.user_id IS NULL)     AS v1_canceled_trial,
-          COUNT(*) FILTER (WHERE ${PAID_CANCEL}  AND s.user_id IS NULL)     AS v1_canceled_active,
-          COUNT(*) FILTER (WHERE ${TRIAL_CANCEL} AND s.user_id IS NOT NULL) AS v2_canceled_trial,
-          COUNT(*) FILTER (WHERE ${PAID_CANCEL}  AND s.user_id IS NOT NULL) AS v2_canceled_active
+      const CMP_BASE = (extraWhere, sinceD, untilD) => `
         FROM companies
         JOIN LATERAL (
           SELECT * FROM users WHERE company_id = companies.id ORDER BY id ASC LIMIT 1
@@ -885,20 +932,56 @@ export async function onRequest(context) {
         LEFT JOIN LATERAL (
           SELECT * FROM onboarding_v2_sessions WHERE user_id = u.id ORDER BY updated_at DESC LIMIT 1
         ) s ON true
-        WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+        ${FIRST_SESSION_JOIN}
+        WHERE companies.created_at >= '${sinceD}' AND companies.created_at < '${untilD}'
         ${INTERNAL_FILTER}
-      `);
-      if (cmpRows[0]) {
-        const [v1s, v2s, v1t, v2t, v1a, v2a, v1ct, v1ca, v2ct, v2ca] = cmpRows[0];
-        compare = {
-          v1_signups: Number(v1s), v2_signups: Number(v2s),
-          v1_trialing: Number(v1t), v2_trialing: Number(v2t),
-          v1_active: Number(v1a), v2_active: Number(v2a),
-          v1_canceled_trial: Number(v1ct), v1_canceled_active: Number(v1ca),
-          v2_canceled_trial: Number(v2ct), v2_canceled_active: Number(v2ca),
-        };
+        ${extraWhere}
+      `;
+      const CMP_COUNTS = (trialingExpr) => `
+        COUNT(*)                                            AS signups,
+        COUNT(*) FILTER (WHERE ${trialingExpr})             AS trialing,
+        COUNT(*) FILTER (WHERE sub.status = 'active')       AS active,
+        COUNT(*) FILTER (WHERE ${TRIAL_CANCEL})             AS canceled_trial,
+        COUNT(*) FILTER (WHERE ${PAID_CANCEL})              AS canceled_active
+      `;
+
+      const [v2Rows, legacyRows] = await Promise.all([
+        runSQL(env, `
+          SELECT ${COHORT_CASE('f')} AS cohort, ${SOURCE_CASE} AS source, ${DEVICE_CASE} AS device,
+                 ${CMP_COUNTS(PAYWALL('s'))}
+          ${CMP_BASE('AND f.user_id IS NOT NULL', since, until1)}
+          GROUP BY cohort, source, device
+        `),
+        runSQL(env, `
+          SELECT 'legacy' AS cohort, ${SOURCE_CASE} AS source, ${DEVICE_CASE} AS device,
+                 ${CMP_COUNTS("sub.status = 'trialing'")}
+          ${CMP_BASE('AND f.user_id IS NULL', LEGACY_WINDOW.since, LEGACY_WINDOW.until)}
+          GROUP BY cohort, source, device
+        `),
+      ]);
+
+      for (const [cohort, source, device, sg, tr, ac, ct, ca] of [...legacyRows, ...v2Rows]) {
+        compare_cube.push({
+          cohort, source, device,
+          signups: Number(sg), trialing: Number(tr), active: Number(ac),
+          canceled_trial: Number(ct), canceled_active: Number(ca),
+        });
       }
-    } catch (e) { compare = null; }
+
+      // Back-compat shape for anything still reading mb.compare.
+      const sum = (cohorts, key) => compare_cube
+        .filter(r => cohorts.includes(r.cohort))
+        .reduce((acc, r) => acc + r[key], 0);
+      compare = {
+        v1_signups: sum(['legacy'], 'signups'),          v2_signups: sum(['v2', 'v2.1'], 'signups'),
+        v1_trialing: sum(['legacy'], 'trialing'),        v2_trialing: sum(['v2', 'v2.1'], 'trialing'),
+        v1_active: sum(['legacy'], 'active'),            v2_active: sum(['v2', 'v2.1'], 'active'),
+        v1_canceled_trial: sum(['legacy'], 'canceled_trial'),
+        v1_canceled_active: sum(['legacy'], 'canceled_active'),
+        v2_canceled_trial: sum(['v2', 'v2.1'], 'canceled_trial'),
+        v2_canceled_active: sum(['v2', 'v2.1'], 'canceled_active'),
+      };
+    } catch (e) { compare = null; compare_cube = []; }
 
     // 9. Financial metrics
     const churn_count = churnList.length;
@@ -922,6 +1005,7 @@ export async function onRequest(context) {
       granularity,
       signups_daily,
       signups_by_campaign,
+      signups_by_ad,
       trials_by_campaign,
       trials_daily,
       activations_daily,
@@ -931,17 +1015,23 @@ export async function onRequest(context) {
       },
       funnel_by_source: funnelBySource,
       funnel_by_device: funnelByDevice,
+      funnel_cube,
       funnel_v2,
       funnel_v2_by_source,
       funnel_v2_by_device,
+      funnel_v2_cube,
       trials_v2_daily,
       activations_v2_daily,
       funnel_v2_period,
       cancellations_daily,
       cancellations_v2_daily,
       trial_behavior_v2,
+      trial_behavior_v2_by_cohort,
       canceled_trial_stats,
       compare,
+      compare_cube,
+      legacy_window: LEGACY_WINDOW,
+      v21_cutoff: V21_CUTOFF,
       trial_behavior,
       trialing,
       active_paid,

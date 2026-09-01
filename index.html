@@ -346,28 +346,67 @@
   <p class="tab-goal"><strong>Goal:</strong> Find leaking buckets — which steps lose the most users, and does the drop vary by acquisition channel? Compare new (V2) vs legacy onboarding performance.</p>
 
   <nav class="funnel-sub-nav">
-    <button class="active" onclick="switchFunnelTab('v2')">Onboarding v2</button>
+    <button class="active" onclick="switchFunnelTab('v21')">Onboarding v2.1</button>
+    <button onclick="switchFunnelTab('v2')">Onboarding v2</button>
     <button onclick="switchFunnelTab('v1')">Legacy Onboarding</button>
     <button onclick="switchFunnelTab('compare')">Compare</button>
   </nav>
 
-  <!-- ── V2 Panel ── -->
-  <div id="funnel-v2-panel" class="funnel-panel active">
+  <!-- ── V2.1 Panel ── -->
+  <div id="funnel-v21-panel" class="funnel-panel active">
     <div class="section-card">
-      <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
-      <p class="data-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
-      Until 26 Aug, reaching the end of onboarding required entering a card, so "onboarding done" and "trial started"
-      were the same moment. From 27 Aug a contact finishes onboarding and gets into the app with no card, and hits the
-      paywall later, when they try to start the trial.
-      <br><br>
-      <strong>Step 8 (Trial) is comparable across that date</strong>: it means "passed the paywall" both before and after,
-      keyed on the Stripe checkout session, which survives cancellation. Steps 1 to 6 and step 9 are unchanged too.
-      <strong>Step 7 is not a trend line across 27 Aug</strong>: before that date it holds contacts stopped AT the Stripe
-      checkout who never entered the app, and after it, contacts inside the app with no card. The two never overlap in
-      time, so it is a clean handover on a known date rather than a mixture.
-      <br><br>
-      Practical consequence: any movement in <strong>Signup&rarr;Trial</strong> from the week of 31 Aug is driven by the
-      paywall move, not by the ad campaigns that started that same week.</p>
+      <h3>Onboarding v2.1 Funnel — 9 steps, unique by email</h3>
+      <p class="data-note"><strong>Contacts whose first onboarding session started on or after 27 Aug 2026, 14:00</strong>,
+      the release that moved the paywall to after onboarding. Measured the way we measure now: step 7 is finishing
+      onboarding and getting into the app with no card, and step 8 is passing the paywall, keyed on the Stripe checkout
+      session so it survives a cancellation.</p>
+      <div id="funnel-v21-filters" style="margin-bottom:14px">
+        <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v21-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+        <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v21-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+      </div>
+      <div id="funnel-v21-steps"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3 class="collapsible-hdr" onclick="toggleSection('source-grid-v21-wrap','buckets-ch-v21-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2.1 — Leaking Buckets by Channel
+        <span id="buckets-ch-v21-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="source-grid-v21-wrap" style="display:none">
+        <div class="source-grid" id="source-grid-v21">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-card">
+      <h3 class="collapsible-hdr" onclick="toggleSection('device-grid-v21-wrap','buckets-dev-v21-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px">
+        Onboarding v2.1 — Leaking Buckets by Device
+        <span id="buckets-dev-v21-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      </h3>
+      <div id="device-grid-v21-wrap" style="display:none">
+        <div id="device-grid-v21" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-card" style="overflow-x:auto">
+      <h3>Onboarding v2.1 — Channel Breakdown Table</h3>
+      <div id="source-table-v21"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3>Onboarding v2.1 — Trial Behaviour</h3>
+      <div id="trial-behavior-v21"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ── V2 Panel ── -->
+  <div id="funnel-v2-panel" class="funnel-panel">
+    <div class="section-card">
+      <h3>Onboarding v2 Funnel — 9 steps, unique by email</h3>
+      <p class="data-note"><strong>Contacts whose first onboarding session started before 27 Aug 2026, 14:00.</strong>
+      Measured the way this version was measured at the time: until 26 Aug, reaching the end of onboarding required
+      entering a card, so finishing onboarding WAS starting the trial. Step 8 is therefore "onboarding completed" and
+      step 7 the contacts who reached the Stripe checkout and went no further. Today's paywall-based definition is not
+      retro-fitted here, it lives on the Onboarding v2.1 tab.</p>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
@@ -399,10 +438,6 @@
     <div class="section-card" style="overflow-x:auto">
       <h3>Onboarding v2 — Channel Breakdown Table</h3>
       <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
-    </div>
-    <div class="section-card">
-      <h3>Onboarding v2 — Conversion Rates Over Time</h3>
-      <canvas id="v2-conversion-chart" height="90"></canvas>
     </div>
     <div class="section-card">
       <h3>Onboarding v2 — Trial Behaviour</h3>
@@ -445,8 +480,20 @@
   <!-- ── Compare Panel ── -->
   <div id="funnel-compare-panel" class="funnel-panel">
     <div class="section-card">
-      <h3>Legacy vs Onboarding v2 — Signups · Trialing · Active</h3>
+      <h3>Legacy vs Onboarding v2 vs Onboarding v2.1 — Signups, Trialing, Active</h3>
+      <div id="funnel-compare-filters" style="margin-bottom:14px">
+        <div class="filter-row"><span class="filter-label">Source</span><div id="compare-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+        <div class="filter-row"><span class="filter-label">Device</span><div id="compare-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+      </div>
       <div id="funnel-compare"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+    <div class="section-card">
+      <h3>Conversion Rates Over Time — across the v2.1 release</h3>
+      <p class="data-note">One continuous line on purpose, not split by cohort. The two cohorts are sequential in time, so
+      splitting would cut one series in half at 27 Aug rather than give two comparable ones. Step 8 (Trial) is keyed on the
+      Stripe checkout session, which means the same thing on both sides of the release, so the trend is readable straight
+      through it. The annotation marks the release.</p>
+      <canvas id="v2-conversion-chart" height="90"></canvas>
     </div>
   </div>
 </main>
@@ -530,9 +577,12 @@ let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
 let annotationsV2Data = {}; // same shape — Onboarding V2 chart (independent)
 let currentAnnotNamespace = 'all'; // tracks which chart opened the annotation modal
-let funnelFilter   = { type: null, value: null }; // type: 'source'|'device', value: key
-let funnelV2Filter = { type: null, value: null }; // type: 'source', value: key
-let activeFunnelTab = 'v2';
+// Independent per dimension: picking a device no longer clears the source.
+let funnelFilter    = { source: 'all', device: 'all' };
+let funnelV2Filter  = { source: 'all', device: 'all', cohort: 'v2' };
+let funnelV21Filter = { source: 'all', device: 'all', cohort: 'v2.1' };
+let compareFilter   = { source: 'all', device: 'all' };
+let activeFunnelTab = 'v21';
 
 // Date picker state
 let dp = { unit: 'week', mode: 'last_n', n: 6 };
@@ -594,6 +644,83 @@ const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustp
 const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
 function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
 function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
+
+// ── Onboarding cohorts ─────────────────────────────────────────────────────
+const COHORT_LABELS = { 'v2': 'Onboarding v2', 'v2.1': 'Onboarding v2.1', 'legacy': 'Legacy' };
+function cohortLabel(c) { return COHORT_LABELS[c] || c; }
+
+// ── Cube helpers ───────────────────────────────────────────────────────────
+// The API ships one cube keyed by (cohort, source, device) rather than separate
+// one-dimensional breakdowns. Two breakdowns cannot answer "meta AND desktop",
+// which is why picking a device used to wipe the source. 'all' on a dimension
+// means "do not constrain it", so the filters combine freely.
+function cubeMatch(row, f) {
+  return (f.cohort == null || f.cohort === 'all' || row.cohort === f.cohort)
+      && (f.source == null || f.source === 'all' || row.source === f.source)
+      && (f.device == null || f.device === 'all' || row.device === f.device);
+}
+
+function cubeSteps(cube, f) {
+  const out = Array(9).fill(0);
+  for (const r of cube || []) if (cubeMatch(r, f)) r.steps.forEach((v, i) => { out[i] += v; });
+  return out;
+}
+
+function cubeCompare(cube, f, cohort) {
+  const out = { signups: 0, trialing: 0, active: 0, canceled_trial: 0, canceled_active: 0 };
+  for (const r of cube || []) {
+    if (r.cohort !== cohort || !cubeMatch(r, { ...f, cohort: 'all' })) continue;
+    for (const k in out) out[k] += r[k] || 0;
+  }
+  return out;
+}
+
+// Pill counts for one dimension are computed with the OTHER filters applied, so
+// "Meta 11" moves when you also pick a device instead of staying stale.
+function cubeDimCounts(cube, f, dim) {
+  const counts = {};
+  for (const r of cube || []) {
+    if (!cubeMatch(r, { ...f, [dim]: 'all' })) continue;
+    const n = r.steps ? r.steps[0] : (r.signups || 0);
+    counts[r[dim]] = (counts[r[dim]] || 0) + n;
+  }
+  return counts;
+}
+
+// Legend for the stacked funnel bars. The bars have exactly three segments, and
+// the third one is everything that is not Meta and not Google (organic, taaft,
+// chatgpt.com and friends), so it is named for what it holds rather than
+// "Organic". Only the segments actually present are listed, so picking a cohort
+// with no Google traffic does not show a Google swatch.
+function sourceLegend(fbs) {
+  const other = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google');
+  const items = [
+    { on: (fbs.meta?.[0] || 0) > 0,   color: 'var(--meta)',    label: 'Meta' },
+    { on: (fbs.google?.[0] || 0) > 0, color: 'var(--google)',  label: 'Google Ads' },
+    { on: other.some(k => (fbs[k]?.[0] || 0) > 0), color: 'var(--organic)',
+      label: other.length > 1 ? 'Organic and other' : 'Organic' },
+  ].filter(i => i.on);
+  if (items.length < 2) return '';
+  return `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)">`
+    + items.map(i => `<span style="display:inline-flex;align-items:center;gap:5px">`
+      + `<span style="width:9px;height:9px;border-radius:2px;background:${i.color};display:inline-block"></span>${i.label}</span>`).join('')
+    + `</div>`;
+}
+
+function renderPills(elId, dim, counts, current, setter, labelFn) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const keys = Object.keys(counts).filter(k => k !== '_error').sort((a, b) => counts[b] - counts[a]);
+  if (!keys.length) { el.innerHTML = '<span style="color:var(--muted);font-size:11px">No data</span>'; return; }
+  const total = keys.reduce((s, k) => s + counts[k], 0);
+  el.innerHTML = ['all', ...keys].map(k => {
+    const isAll = k === 'all';
+    const lbl   = isAll ? 'All' : (labelFn ? labelFn(k) : k);
+    const n     = isAll ? total : counts[k];
+    return `<button class="filter-pill ${current === k ? 'active' : ''}" onclick="${setter}('${dim}','${k}')">`
+         + `${lbl} <span style="color:var(--muted);margin-left:2px">${fmtN(n)}</span></button>`;
+  }).join('');
+}
 
 // Merge two daily arrays (same structure: [{date, count, meta, google, ...}])
 function mergeDailyMaps(a, b) {
@@ -904,11 +1031,13 @@ async function loadAll() {
   renderSignupsChart();
   renderTables();
   renderFunnelV2Steps();
-  renderSourceGridV2();
-  renderDeviceGridV2();
-  renderSourceTableV2();
+  for (const c of ['v2', 'v2.1']) {
+    renderSourceGridV2(c);
+    renderDeviceGridV2(c);
+    renderSourceTableV2(c);
+    renderTrialBehaviorV2(c);
+  }
   renderV2ConversionChart();
-  renderTrialBehaviorV2();
   renderFunnelSteps();
   renderSourceGrid();
   renderDeviceGrid();
@@ -1419,9 +1548,15 @@ function renderTables() {
     mEl.innerHTML = '<p class="no-data">No data</p>';
   } else {
     const rows = (meta.campaigns || []).filter(c => c.spend > 0).map(c => {
+      // Prefer the utm_campaign values read off the campaign's own ads: the
+      // hardcoded map went stale on the 31 Aug relaunch and showed ~1,000 EUR of
+      // spend against zero signups. The map stays as a fallback for campaigns
+      // whose ads no longer carry a readable UTM.
+      const utms  = c.utm_campaigns || [];
       const entry = META_CAMPAIGN_MAP.find(m => m.name === c.name);
-      const matchFn = entry
-        ? (entry.matchFn || (u => u === entry.utm))
+      const matchFn = utms.length
+        ? (u => utms.includes(u))
+        : entry ? (entry.matchFn || (u => u === entry.utm))
         : (u => false);
       const sigs = sumCampaignMetric(sigsByCamp, 'meta', matchFn, 'signups');
       const trls = sumCampaignMetric(trlsByCamp, 'meta', matchFn, 'trials');
@@ -1438,7 +1573,10 @@ function renderTables() {
     });
     mEl.innerHTML = `<table><thead><tr>
       <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
-    </tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    </tr></thead><tbody>${rows.join('')}</tbody></table>
+    <p class="data-note" style="margin-top:10px">Spend from Meta, signups and trials from Metabase, joined on
+    <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups and CPL spend ÷ trials, so neither
+    uses Meta's attributed conversion count.</p>`;
   }
 
   // ── Google table ──
@@ -1473,7 +1611,7 @@ function renderTables() {
 function switchFunnelTab(tab) {
   activeFunnelTab = tab;
   document.querySelectorAll('.funnel-sub-nav button').forEach((b, i) => {
-    const tabs = ['v2', 'v1', 'compare'];
+    const tabs = ['v21', 'v2', 'v1', 'compare'];
     b.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.funnel-panel').forEach(p => p.classList.remove('active'));
@@ -1482,98 +1620,109 @@ function switchFunnelTab(tab) {
 
 // ── V2 Funnel ─────────────────────────────────────────────────────────────
 
-function setFunnelV2Filter(type, value) {
-  if (value === 'all' || (funnelV2Filter.type === type && funnelV2Filter.value === value)) {
-    funnelV2Filter = { type: null, value: null };
-  } else {
-    funnelV2Filter = { type, value };
+// The v2 and v2.1 tabs are the same funnel read two ways, so one renderer serves
+// both. Each tab is pinned to its cohort and to the measurement that was in force
+// for that cohort: v2 the pre-27-Aug definition, v2.1 today's paywall-based one.
+const V2_TABS = {
+  'v2.1': {
+    filter: () => funnelV21Filter, setter: 'setFunnelV21Filter', stepsKey: 'steps',
+    elId: 'funnel-v21-steps', src: 'funnel-v21-src-pills', dev: 'funnel-v21-dev-pills',
+    step7: 'Step 7 — Onboarding done, no card',
+    step8: 'Step 8 — Trial (paywall passed)',
+  },
+  'v2': {
+    filter: () => funnelV2Filter, setter: 'setFunnelV2Filter', stepsKey: 'steps_pre827',
+    elId: 'funnel-v2-steps', src: 'funnel-v2-src-pills', dev: 'funnel-v2-dev-pills',
+    step7: 'Step 7 — Reached Stripe checkout',
+    step8: 'Step 8 — Trial (onboarding completed)',
+  },
+};
+
+// Breakdown maps for the secondary sections inside a cohort's tab, derived from
+// the cube so they read the same cohort and the same measurement as the funnel
+// above them. Without this they silently aggregated v2 and v2.1 together while
+// sitting under a tab named for one of them.
+function v2Breakdown(cohort, dim) {
+  const { mb } = state;
+  const cfg = V2_TABS[cohort];
+  const out = {};
+  for (const r of mb?.funnel_v2_cube || []) {
+    if (r.cohort !== cohort) continue;
+    const steps = r[cfg.stepsKey] || r.steps;
+    if (!out[r[dim]]) out[r[dim]] = Array(9).fill(0);
+    steps.forEach((v, i) => { out[r[dim]][i] += v; });
   }
-  renderFunnelV2Filters();
-  renderFunnelV2Steps();
+  return out;
 }
 
-function renderFunnelV2Filters() {
-  const { mb } = state;
-  if (!mb) return;
-  const fbs = mb.funnel_v2_by_source || {};
-  const fbd = mb.funnel_v2_by_device || {};
-  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
-
-  document.getElementById('funnel-v2-src-pills').innerHTML =
-    ['all', ...srcKeys].map(s => {
-      const isAll   = s === 'all';
-      const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'source' && funnelV2Filter.value === s);
-      const lbl     = isAll ? 'All' : srcLabel(s);
-      const n       = isAll ? '' : ` <span style="color:var(--muted);margin-left:2px">${fmtN(fbs[s]?.[0] || 0)}</span>`;
-      const onclick = isAll ? `setFunnelV2Filter('source','all')` : `setFunnelV2Filter('source','${s}')`;
-      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${lbl}${n}</button>`;
-    }).join('');
-
-  document.getElementById('funnel-v2-dev-pills').innerHTML = devKeys.length
-    ? ['all', ...devKeys].map(d => {
-        const isAll   = d === 'all';
-        const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'device' && funnelV2Filter.value === d);
-        const onclick = isAll ? `setFunnelV2Filter('device','all')` : `setFunnelV2Filter('device','${d}')`;
-        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${isAll ? 'All' : d}</button>`;
-      }).join('')
-    : '<span style="color:var(--muted);font-size:11px">No device data</span>';
+function setFunnelV2Filter(dim, value) {
+  funnelV2Filter = { ...funnelV2Filter, [dim]: value };
+  renderV2Funnel('v2');
 }
 
-function renderFunnelV2Steps() {
+function setFunnelV21Filter(dim, value) {
+  funnelV21Filter = { ...funnelV21Filter, [dim]: value };
+  renderV2Funnel('v2.1');
+}
+
+function renderV2Funnel(cohort) {
   const { mb } = state;
-  const el = document.getElementById('funnel-v2-steps');
-  if (!mb?.funnel_v2?.steps) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  const cfg = V2_TABS[cohort];
+  const el  = document.getElementById(cfg.elId);
+  if (!el) return;
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  renderFunnelV2Filters();
+  const f    = cfg.filter();
+  const cube = mb.funnel_v2_cube.filter(r => r.cohort === cohort)
+    .map(r => ({ ...r, steps: r[cfg.stepsKey] || r.steps }));
 
-  let steps;
-  if (funnelV2Filter.type === 'source') {
-    steps = mb.funnel_v2_by_source?.[funnelV2Filter.value] || mb.funnel_v2.steps;
-  } else if (funnelV2Filter.type === 'device') {
-    steps = mb.funnel_v2_by_device?.[funnelV2Filter.value] || mb.funnel_v2.steps;
-  } else {
-    steps = mb.funnel_v2.steps;
-  }
+  renderPills(cfg.src, 'source', cubeDimCounts(cube, f, 'source'), f.source, cfg.setter, srcLabel);
+  renderPills(cfg.dev, 'device', cubeDimCounts(cube, f, 'device'), f.device, cfg.setter);
 
+  const steps = cubeSteps(cube, f);
   const total = steps[0] || 1;
-  const fbs = funnelV2Filter.type === null ? (mb.funnel_v2_by_source || {}) : {};
+
+  // Source segments only while the source is unfiltered.
+  const splitBySource = f.source === 'all';
+  const fbs = {};
+  if (splitBySource) {
+    for (const r of cube) {
+      if (!cubeMatch(r, { ...f, source: 'all' })) continue;
+      if (!fbs[r.source]) fbs[r.source] = Array(9).fill(0);
+      r.steps.forEach((v, i) => { fbs[r.source][i] += v; });
+    }
+  }
 
   const rows = [
-    { label: 'Step 1 — Email Confirmed',     val: steps[0], idx: 0 },
-    { label: 'Step 2 — Domain Provided',     val: steps[1], idx: 1 },
-    { label: 'Step 3 — Business Details',    val: steps[2], idx: 2 },
-    { label: 'Step 4 — ICP Accepted',        val: steps[3], idx: 3 },
-    { label: 'Step 5 — Channels Accepted',   val: steps[4], idx: 4 },
-    { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
-    { label: 'Step 7 — Onboarding done, no card', val: steps[6], idx: 6 },
-    { label: 'Step 8 — Trial (card in)',     val: steps[7], idx: 7 },
-    { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
+    { label: 'Step 1 — Email Confirmed',   val: steps[0], idx: 0 },
+    { label: 'Step 2 — Domain Provided',   val: steps[1], idx: 1 },
+    { label: 'Step 3 — Business Details',  val: steps[2], idx: 2 },
+    { label: 'Step 4 — ICP Accepted',      val: steps[3], idx: 3 },
+    { label: 'Step 5 — Channels Accepted', val: steps[4], idx: 4 },
+    { label: 'Step 6 — Sequence Accepted', val: steps[5], idx: 5 },
+    { label: cfg.step7,                    val: steps[6], idx: 6 },
+    { label: cfg.step8,                    val: steps[7], idx: 7 },
+    { label: 'Step 9 — Active',            val: steps[8] || 0, idx: 8 },
   ];
 
   el.innerHTML = rows.map((row, i) => {
-    const val     = row.val || 0;
-    const prevVal = i === 0 ? total : (rows[i - 1].val || 1);
+    const val      = row.val || 0;
+    const prevVal  = i === 0 ? total : (rows[i - 1].val || 1);
     const pctTotal = Math.round((val / total) * 100);
     const dropPct  = i > 0 ? Math.round(((prevVal - val) / prevVal) * 100) : null;
 
     let barInner;
-    if (funnelV2Filter.type === null) {
+    if (splitBySource) {
       const mV = fbs.meta?.[row.idx]   || 0;
       const gV = fbs.google?.[row.idx] || 0;
       const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google')
-                  .reduce((s, k) => s + (fbs[k]?.[row.idx] || 0), 0);
+                  .reduce((sum, k) => sum + (fbs[k]?.[row.idx] || 0), 0);
       const srcTot = mV + gV + oV || 1;
-      const mW = (mV / srcTot) * pctTotal;
-      const gW = (gV / srcTot) * pctTotal;
-      const oW = (oV / srcTot) * pctTotal;
-      barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
-    } else if (funnelV2Filter.type === 'source') {
-      const color = srcColor(funnelV2Filter.value);
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+      barInner = `<div class="seg-meta" style="flex:${(mV / srcTot) * pctTotal}"></div>`
+               + `<div class="seg-google" style="flex:${(gV / srcTot) * pctTotal}"></div>`
+               + `<div class="seg-organic" style="flex:${(oV / srcTot) * pctTotal}"></div>`;
     } else {
-      const color = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' }[funnelV2Filter.value] || '#94a3b8';
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+      barInner = `<div style="flex:1;background:${srcColor(f.source)};border-radius:4px"></div>`;
     }
 
     return `<div class="funnel-step">
@@ -1589,15 +1738,22 @@ function renderFunnelV2Steps() {
         <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + sourceLegend(fbs);
 }
 
-function renderSourceGridV2() {
-  const { mb } = state;
-  const el = document.getElementById('source-grid-v2');
-  if (!mb?.funnel_v2_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+// Kept as the name the data-load path calls.
+function renderFunnelV2Steps() {
+  renderV2Funnel('v2.1');
+  renderV2Funnel('v2');
+}
 
-  const fbs = mb.funnel_v2_by_source;
+function renderSourceGridV2(cohort = 'v2') {
+  const { mb } = state;
+  const el = document.getElementById(cohort === 'v2.1' ? 'source-grid-v21' : 'source-grid-v2');
+  if (!el) return;
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const fbs = v2Breakdown(cohort, 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
   const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
 
@@ -1627,11 +1783,11 @@ function renderSourceGridV2() {
   }).join('');
 }
 
-function renderDeviceGridV2() {
+function renderDeviceGridV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('device-grid-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'device-grid-v21' : 'device-grid-v2');
   if (!el) return;
-  const fbd = mb?.funnel_v2_by_device;
+  const fbd = v2Breakdown(cohort, 'device');
   if (!fbd || Object.keys(fbd).length === 0) { el.innerHTML = '<p class="no-data">No device data</p>'; return; }
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
@@ -1660,12 +1816,13 @@ function renderDeviceGridV2() {
   }).join('');
 }
 
-function renderSourceTableV2() {
+function renderSourceTableV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('source-table-v2');
-  if (!mb?.funnel_v2_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  const el = document.getElementById(cohort === 'v2.1' ? 'source-table-v21' : 'source-table-v2');
+  if (!el) return;
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const fbs     = mb.funnel_v2_by_source;
+  const fbs     = v2Breakdown(cohort, 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
 
   const rows = srcKeys.map(key => {
@@ -1766,11 +1923,11 @@ function renderV2ConversionChart() {
   }
 }
 
-function renderTrialBehaviorV2() {
+function renderTrialBehaviorV2(cohort = 'v2') {
   const { mb } = state;
-  const el = document.getElementById('trial-behavior-v2');
+  const el = document.getElementById(cohort === 'v2.1' ? 'trial-behavior-v21' : 'trial-behavior-v2');
   if (!el) return;
-  const tb = mb?.trial_behavior_v2;
+  const tb = mb?.trial_behavior_v2_by_cohort?.[cohort] || mb?.trial_behavior_v2;
   if (!tb) { el.innerHTML = '<p class="no-data">No data yet — trial behaviour populates once v2 users have been in trial for some time</p>'; return; }
 
   const fmtDays = v => v != null ? parseFloat(v).toFixed(1) + ' days' : '–';
@@ -1819,12 +1976,43 @@ function renderTrialBehaviorV2() {
 
 // ── Compare ───────────────────────────────────────────────────────────────
 
+function setCompareFilter(dim, value) {
+  compareFilter = { ...compareFilter, [dim]: value };
+  renderFunnelCompare();
+}
+
+function fmtWindow(since, untilExclusive) {
+  const opts = { day: 'numeric', month: 'short', year: 'numeric' };
+  const a = new Date(since + 'T00:00:00Z');
+  const b = new Date(untilExclusive + 'T00:00:00Z');
+  b.setUTCDate(b.getUTCDate() - 1);
+  return `${a.toLocaleDateString('en-GB', opts)} to ${b.toLocaleDateString('en-GB', opts)}`;
+}
+
 function renderFunnelCompare() {
   const { mb } = state;
   const el = document.getElementById('funnel-compare');
-  if (!mb?.compare) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  if (!mb?.compare_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const c = mb.compare;
+  const cube = mb.compare_cube;
+  renderPills('compare-src-pills', 'source',
+    cubeDimCounts(cube, compareFilter, 'source'), compareFilter.source, 'setCompareFilter', srcLabel);
+  renderPills('compare-dev-pills', 'device',
+    cubeDimCounts(cube, compareFilter, 'device'), compareFilter.device, 'setCompareFilter');
+
+  const lw = mb.legacy_window || { since: '2026-02-01', until: '2026-05-01' };
+  const cols = [
+    { key: 'legacy', label: 'Legacy',          color: 'var(--accent)',
+      sub: `${fmtWindow(lw.since, lw.until)} · fixed`,
+      data: cubeCompare(cube, compareFilter, 'legacy') },
+    { key: 'v2',     label: 'Onboarding v2',   color: 'var(--teal)',
+      sub: 'first session before 27 Aug 2026, 14:00',
+      data: cubeCompare(cube, compareFilter, 'v2') },
+    { key: 'v2.1',   label: 'Onboarding v2.1', color: 'var(--green)',
+      sub: 'first session from 27 Aug 2026, 14:00',
+      data: cubeCompare(cube, compareFilter, 'v2.1') },
+  ];
+
   const pct = (n, base) => base > 0 ? (n / base * 100).toFixed(1) + '%' : '–';
   const bar = (n, base, color) => {
     const w = base > 0 ? Math.round(n / base * 100) : 0;
@@ -1833,88 +2021,79 @@ function renderFunnelCompare() {
   };
 
   const rows = [
-    { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
-    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
-    { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
-    { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
-    { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
+    { key: 'signups',         label: 'Signups',
+      note: 'Legacy: no v2 session. v2 / v2.1: split on the FIRST v2 session, so a contact who signed up earlier and reopened onboarding stays in the cohort they first saw' },
+    { key: 'trialing',        label: 'Trialing',
+      note: 'Legacy: sub.status = trialing. v2 and v2.1: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
+    { key: 'active',          label: 'Active',                  note: 'sub.status = active' },
+    { key: 'canceled_trial',  label: 'Canceled (during trial)', note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
+    { key: 'canceled_active', label: 'Canceled (after active)', note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
   ];
 
-  const rowColor = (label, side) => {
-    if (label.startsWith('Canceled')) return 'var(--red)';
-    if (label === 'Active') return 'var(--green)';
-    return side === 'v1' ? 'var(--accent)' : 'var(--teal)';
+  const rowColor = (key, col) => {
+    if (key.startsWith('canceled')) return 'var(--red)';
+    if (key === 'active') return 'var(--green)';
+    return col.color;
   };
 
-  const tableRows = rows.map(r => `
-    <tr style="border-bottom:1px solid var(--border)">
+  const tableRows = rows.map(r => {
+    const cells = cols.map(col => {
+      const val  = col.data[r.key] || 0;
+      const base = col.data.signups || 0;
+      const isSignups = r.key === 'signups';
+      // Under 30 in the denominator a percentage reads as precision that is not
+      // there, so show the count alone.
+      const thin = !isSignups && base < 30;
+      return `<td style="padding:12px 14px;text-align:center">
+        <div style="font-size:16px;font-weight:700">${fmtN(val)}</div>
+        <div style="font-size:11px;color:var(--muted)">${
+          isSignups ? '—' : (thin ? `n=${fmtN(base)}, too few for %` : pct(val, base) + ' of signups')}</div>
+        ${isSignups || thin ? '' : bar(val, base, rowColor(r.key, col))}
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:12px 14px;font-weight:600">${r.label}</td>
-      <td style="padding:12px 14px;text-align:center">
-        <div style="font-size:16px;font-weight:700">${fmtN(r.v1)}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v1, c.v1_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v1, c.v1_signups, rowColor(r.label, 'v1')) : ''}
-      </td>
-      <td style="padding:12px 14px;text-align:center">
-        <div style="font-size:16px;font-weight:700">${fmtN(r.v2)}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v2, c.v2_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v2, c.v2_signups, rowColor(r.label, 'v2')) : ''}
-      </td>
+      ${cells}
       <td style="padding:12px 14px;font-size:11px;color:var(--muted)">${r.note}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+
+  const heads = cols.map(c => `<th style="padding:10px 14px;text-align:center;color:${c.color}">
+      ${c.label}<div style="font-weight:400;font-size:10px;color:var(--muted);margin-top:2px">${c.sub}</div></th>`).join('');
 
   el.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="border-bottom:2px solid var(--border)">
           <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px"></th>
-          <th style="padding:10px 14px;text-align:center;color:var(--accent)">Legacy</th>
-          <th style="padding:10px 14px;text-align:center;color:var(--teal)">Onboarding v2</th>
+          ${heads}
           <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px">Definition</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
-    </table>`;
+    </table>
+    <p class="data-note" style="margin-top:12px">The Legacy column is pinned to a fixed benchmark window and does not follow the date
+    picker. Legacy was 100% of signups in Feb and Mar 2026 and 72.7% in April; from May it is a residual tail of 7 to 20 a month, so inside
+    a recent window the column was noise rather than a population. April is in the window because <code>signup_user_agent</code> only starts
+    being recorded then: 77.2% of Feb and Mar has no device, which is why <strong>unknown</strong> is kept as a visible device pill instead
+    of quietly dropping those contacts. The other two columns follow the date picker.</p>`;
 }
 
 // ══ FUNNEL (LEGACY V1) ════════════════════════════════════════════════════
 
-function setFunnelFilter(type, value) {
-  if (funnelFilter.type === type && funnelFilter.value === value) {
-    funnelFilter = { type: null, value: null };
-  } else {
-    funnelFilter = { type, value };
-  }
-  renderFunnelFilters();
+function setFunnelFilter(dim, value) {
+  funnelFilter = { ...funnelFilter, [dim]: value };
   renderFunnelSteps();
 }
 
 function renderFunnelFilters() {
   const { mb } = state;
   if (!mb) return;
-  const fbs = mb.funnel_by_source || {};
-  const fbd = mb.funnel_by_device || {};
-
-  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  document.getElementById('funnel-src-pills').innerHTML =
-    ['all', ...srcKeys].map(s => {
-      const isAll = s === 'all';
-      const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'source' && funnelFilter.value === s);
-      const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('source','${s}')`;
-      const lbl    = isAll ? 'All' : srcLabel(s);
-      const n      = isAll ? '' : ` <span style="opacity:.6">${fmtN(fbs[s]?.[0]||0)}</span>`;
-      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}${n}</button>`;
-    }).join('');
-
-  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
-  document.getElementById('funnel-dev-pills').innerHTML = devKeys.length
-    ? ['all', ...devKeys].map(d => {
-        const isAll = d === 'all';
-        const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'device' && funnelFilter.value === d);
-        const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('device','${d}')`;
-        const lbl    = isAll ? 'All' : (d.charAt(0).toUpperCase() + d.slice(1));
-        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}</button>`;
-      }).join('')
-    : '<span style="font-size:11px;color:var(--muted)">loading…</span>';
+  const cube = mb.funnel_cube || [];
+  renderPills('funnel-src-pills', 'source',
+    cubeDimCounts(cube, funnelFilter, 'source'), funnelFilter.source, 'setFunnelFilter', srcLabel);
+  renderPills('funnel-dev-pills', 'device',
+    cubeDimCounts(cube, funnelFilter, 'device'), funnelFilter.device, 'setFunnelFilter');
 }
 
 function renderFunnelSteps() {
@@ -1924,19 +2103,20 @@ function renderFunnelSteps() {
 
   renderFunnelFilters();
 
-  // Pick steps array based on active filter
-  let steps;
-  if (funnelFilter.type === 'source') {
-    steps = mb.funnel_by_source?.[funnelFilter.value] || mb.funnel.steps;
-  } else if (funnelFilter.type === 'device') {
-    steps = mb.funnel_by_device?.[funnelFilter.value] || mb.funnel.steps;
-  } else {
-    steps = mb.funnel.steps;
-  }
-
+  const cube  = mb.funnel_cube || [];
+  const steps = cube.length ? cubeSteps(cube, funnelFilter) : mb.funnel.steps;
   const total = steps[0] || 1;
-  // Only show source bar segments when no filter is active
-  const fbs = funnelFilter.type === null ? (mb.funnel_by_source || {}) : {};
+
+  // Source segments only while the source is unfiltered.
+  const splitBySource = funnelFilter.source === 'all';
+  const fbs = {};
+  if (splitBySource) {
+    for (const r of cube) {
+      if (!cubeMatch(r, { ...funnelFilter, source: 'all' })) continue;
+      if (!fbs[r.source]) fbs[r.source] = Array(9).fill(0);
+      r.steps.forEach((v, i) => { fbs[r.source][i] += v; });
+    }
+  }
 
   const rows = [
     { label: 'Step 1 — Signup',               val: steps[0], idx: 0 },
@@ -1958,8 +2138,8 @@ function renderFunnelSteps() {
 
     // Bar fill: solid color when filtered, multi-source segments when unfiltered
     let barInner;
-    if (funnelFilter.type === null) {
-      // No filter — segmented by source
+    if (splitBySource) {
+      // Source unfiltered — segmented by source
       let mW = pctTotal, gW = 0, oW = 0; // fallback: solid accent
       if (row.idx !== null) {
         const mV = fbs.meta?.[row.idx]   || 0;
@@ -1973,11 +2153,8 @@ function renderFunnelSteps() {
       }
       barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
     } else {
-      // Filter active — single solid bar
-      const color = funnelFilter.type === 'source'
-        ? srcColor(funnelFilter.value)
-        : { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' }[funnelFilter.value] || '#94a3b8';
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+      // Single source picked — solid bar in that source's colour
+      barInner = `<div style="flex:1;background:${srcColor(funnelFilter.source)};border-radius:4px"></div>`;
     }
 
     return `<div class="funnel-step">
@@ -1993,7 +2170,7 @@ function renderFunnelSteps() {
         <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + sourceLegend(fbs);
 }
 
 function renderSourceGrid() {
