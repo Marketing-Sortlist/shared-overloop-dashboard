@@ -355,7 +355,7 @@
   <div id="funnel-v2-panel" class="funnel-panel active">
     <div class="section-card">
       <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
-      <p class="data-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
+      <p class="data-note" id="funnel-v2-paywall-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
       Until 26 Aug, reaching the end of onboarding required entering a card, so "onboarding done" and "trial started"
       were the same moment. From 27 Aug a contact finishes onboarding and gets into the app with no card, and hits the
       paywall later, when they try to start the trial.
@@ -369,6 +369,7 @@
       Practical consequence: any movement in <strong>Signup&rarr;Trial</strong> from the week of 31 Aug is driven by the
       paywall move, not by the ad campaigns that started that same week.</p>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
+        <div class="filter-row"><span class="filter-label">Onboarding</span><div id="funnel-v2-coh-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
       </div>
@@ -445,7 +446,11 @@
   <!-- ── Compare Panel ── -->
   <div id="funnel-compare-panel" class="funnel-panel">
     <div class="section-card">
-      <h3>Legacy vs Onboarding v2 — Signups · Trialing · Active</h3>
+      <h3>Legacy vs Onboarding v2 vs Onboarding v2.1 — Signups, Trialing, Active</h3>
+      <div id="funnel-compare-filters" style="margin-bottom:14px">
+        <div class="filter-row"><span class="filter-label">Source</span><div id="compare-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+        <div class="filter-row"><span class="filter-label">Device</span><div id="compare-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+      </div>
       <div id="funnel-compare"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
@@ -530,8 +535,10 @@ let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
 let annotationsV2Data = {}; // same shape — Onboarding V2 chart (independent)
 let currentAnnotNamespace = 'all'; // tracks which chart opened the annotation modal
-let funnelFilter   = { type: null, value: null }; // type: 'source'|'device', value: key
-let funnelV2Filter = { type: null, value: null }; // type: 'source', value: key
+// Independent per dimension: picking a device no longer clears the source.
+let funnelFilter    = { source: 'all', device: 'all' };
+let funnelV2Filter  = { source: 'all', device: 'all', cohort: 'all' };
+let compareFilter   = { source: 'all', device: 'all' };
 let activeFunnelTab = 'v2';
 
 // Date picker state
@@ -594,6 +601,63 @@ const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustp
 const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
 function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
 function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
+
+// ── Onboarding cohorts ─────────────────────────────────────────────────────
+const COHORT_LABELS = { 'v2': 'Onboarding v2', 'v2.1': 'Onboarding v2.1', 'legacy': 'Legacy' };
+function cohortLabel(c) { return COHORT_LABELS[c] || c; }
+
+// ── Cube helpers ───────────────────────────────────────────────────────────
+// The API ships one cube keyed by (cohort, source, device) rather than separate
+// one-dimensional breakdowns. Two breakdowns cannot answer "meta AND desktop",
+// which is why picking a device used to wipe the source. 'all' on a dimension
+// means "do not constrain it", so the filters combine freely.
+function cubeMatch(row, f) {
+  return (f.cohort == null || f.cohort === 'all' || row.cohort === f.cohort)
+      && (f.source == null || f.source === 'all' || row.source === f.source)
+      && (f.device == null || f.device === 'all' || row.device === f.device);
+}
+
+function cubeSteps(cube, f) {
+  const out = Array(9).fill(0);
+  for (const r of cube || []) if (cubeMatch(r, f)) r.steps.forEach((v, i) => { out[i] += v; });
+  return out;
+}
+
+function cubeCompare(cube, f, cohort) {
+  const out = { signups: 0, trialing: 0, active: 0, canceled_trial: 0, canceled_active: 0 };
+  for (const r of cube || []) {
+    if (r.cohort !== cohort || !cubeMatch(r, { ...f, cohort: 'all' })) continue;
+    for (const k in out) out[k] += r[k] || 0;
+  }
+  return out;
+}
+
+// Pill counts for one dimension are computed with the OTHER filters applied, so
+// "Meta 11" moves when you also pick a device instead of staying stale.
+function cubeDimCounts(cube, f, dim) {
+  const counts = {};
+  for (const r of cube || []) {
+    if (!cubeMatch(r, { ...f, [dim]: 'all' })) continue;
+    const n = r.steps ? r.steps[0] : (r.signups || 0);
+    counts[r[dim]] = (counts[r[dim]] || 0) + n;
+  }
+  return counts;
+}
+
+function renderPills(elId, dim, counts, current, setter, labelFn) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const keys = Object.keys(counts).filter(k => k !== '_error').sort((a, b) => counts[b] - counts[a]);
+  if (!keys.length) { el.innerHTML = '<span style="color:var(--muted);font-size:11px">No data</span>'; return; }
+  const total = keys.reduce((s, k) => s + counts[k], 0);
+  el.innerHTML = ['all', ...keys].map(k => {
+    const isAll = k === 'all';
+    const lbl   = isAll ? 'All' : (labelFn ? labelFn(k) : k);
+    const n     = isAll ? total : counts[k];
+    return `<button class="filter-pill ${current === k ? 'active' : ''}" onclick="${setter}('${dim}','${k}')">`
+         + `${lbl} <span style="color:var(--muted);margin-left:2px">${fmtN(n)}</span></button>`;
+  }).join('');
+}
 
 // Merge two daily arrays (same structure: [{date, count, meta, google, ...}])
 function mergeDailyMaps(a, b) {
@@ -1482,42 +1546,26 @@ function switchFunnelTab(tab) {
 
 // ── V2 Funnel ─────────────────────────────────────────────────────────────
 
-function setFunnelV2Filter(type, value) {
-  if (value === 'all' || (funnelV2Filter.type === type && funnelV2Filter.value === value)) {
-    funnelV2Filter = { type: null, value: null };
-  } else {
-    funnelV2Filter = { type, value };
-  }
-  renderFunnelV2Filters();
+function setFunnelV2Filter(dim, value) {
+  funnelV2Filter = { ...funnelV2Filter, [dim]: value };
   renderFunnelV2Steps();
 }
 
 function renderFunnelV2Filters() {
   const { mb } = state;
   if (!mb) return;
-  const fbs = mb.funnel_v2_by_source || {};
-  const fbd = mb.funnel_v2_by_device || {};
-  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
+  const cube = mb.funnel_v2_cube || [];
+  renderPills('funnel-v2-coh-pills', 'cohort',
+    cubeDimCounts(cube, funnelV2Filter, 'cohort'), funnelV2Filter.cohort, 'setFunnelV2Filter', cohortLabel);
+  renderPills('funnel-v2-src-pills', 'source',
+    cubeDimCounts(cube, funnelV2Filter, 'source'), funnelV2Filter.source, 'setFunnelV2Filter', srcLabel);
+  renderPills('funnel-v2-dev-pills', 'device',
+    cubeDimCounts(cube, funnelV2Filter, 'device'), funnelV2Filter.device, 'setFunnelV2Filter');
 
-  document.getElementById('funnel-v2-src-pills').innerHTML =
-    ['all', ...srcKeys].map(s => {
-      const isAll   = s === 'all';
-      const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'source' && funnelV2Filter.value === s);
-      const lbl     = isAll ? 'All' : srcLabel(s);
-      const n       = isAll ? '' : ` <span style="color:var(--muted);margin-left:2px">${fmtN(fbs[s]?.[0] || 0)}</span>`;
-      const onclick = isAll ? `setFunnelV2Filter('source','all')` : `setFunnelV2Filter('source','${s}')`;
-      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${lbl}${n}</button>`;
-    }).join('');
-
-  document.getElementById('funnel-v2-dev-pills').innerHTML = devKeys.length
-    ? ['all', ...devKeys].map(d => {
-        const isAll   = d === 'all';
-        const active  = isAll ? funnelV2Filter.type === null : (funnelV2Filter.type === 'device' && funnelV2Filter.value === d);
-        const onclick = isAll ? `setFunnelV2Filter('device','all')` : `setFunnelV2Filter('device','${d}')`;
-        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${onclick}">${isAll ? 'All' : d}</button>`;
-      }).join('')
-    : '<span style="color:var(--muted);font-size:11px">No device data</span>';
+  // The paywall-move explainer only earns its space when both cohorts are mixed
+  // into one funnel. Pick one and the steps mean one thing, so it is just noise.
+  const note = document.getElementById('funnel-v2-paywall-note');
+  if (note) note.style.display = funnelV2Filter.cohort === 'all' ? '' : 'none';
 }
 
 function renderFunnelV2Steps() {
@@ -1527,17 +1575,32 @@ function renderFunnelV2Steps() {
 
   renderFunnelV2Filters();
 
-  let steps;
-  if (funnelV2Filter.type === 'source') {
-    steps = mb.funnel_v2_by_source?.[funnelV2Filter.value] || mb.funnel_v2.steps;
-  } else if (funnelV2Filter.type === 'device') {
-    steps = mb.funnel_v2_by_device?.[funnelV2Filter.value] || mb.funnel_v2.steps;
-  } else {
-    steps = mb.funnel_v2.steps;
-  }
-
+  const cube  = mb.funnel_v2_cube || [];
+  const steps = cube.length ? cubeSteps(cube, funnelV2Filter) : mb.funnel_v2.steps;
   const total = steps[0] || 1;
-  const fbs = funnelV2Filter.type === null ? (mb.funnel_v2_by_source || {}) : {};
+
+  // Step 7 is the one step that does not mean the same thing on both sides of the
+  // 27 Aug release. Before it, finishing onboarding required a card, so reaching
+  // the end of the flow meant arriving at the Stripe checkout. After it, a contact
+  // finishes and gets into the app with no card. Neither wording is true of both,
+  // so the label follows whichever cohort is selected.
+  const STEP7 = {
+    'v2':   'Step 7 — Reached Stripe checkout',
+    'v2.1': 'Step 7 — Onboarding done, no card',
+    'all':  'Step 7 — Onboarding done, no card / reached checkout',
+  }[funnelV2Filter.cohort] || 'Step 7 — Onboarding done, no card / reached checkout';
+
+  // Colour the bars by source only while the source is unfiltered: once a single
+  // source is picked the split has nothing left to show.
+  const splitBySource = funnelV2Filter.source === 'all';
+  const fbs = {};
+  if (splitBySource) {
+    for (const r of cube) {
+      if (!cubeMatch(r, { ...funnelV2Filter, source: 'all' })) continue;
+      if (!fbs[r.source]) fbs[r.source] = Array(9).fill(0);
+      r.steps.forEach((v, i) => { fbs[r.source][i] += v; });
+    }
+  }
 
   const rows = [
     { label: 'Step 1 — Email Confirmed',     val: steps[0], idx: 0 },
@@ -1546,7 +1609,7 @@ function renderFunnelV2Steps() {
     { label: 'Step 4 — ICP Accepted',        val: steps[3], idx: 3 },
     { label: 'Step 5 — Channels Accepted',   val: steps[4], idx: 4 },
     { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
-    { label: 'Step 7 — Onboarding done, no card', val: steps[6], idx: 6 },
+    { label: STEP7,                          val: steps[6], idx: 6 },
     { label: 'Step 8 — Trial (card in)',     val: steps[7], idx: 7 },
     { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
   ];
@@ -1558,7 +1621,7 @@ function renderFunnelV2Steps() {
     const dropPct  = i > 0 ? Math.round(((prevVal - val) / prevVal) * 100) : null;
 
     let barInner;
-    if (funnelV2Filter.type === null) {
+    if (splitBySource) {
       const mV = fbs.meta?.[row.idx]   || 0;
       const gV = fbs.google?.[row.idx] || 0;
       const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google')
@@ -1568,11 +1631,8 @@ function renderFunnelV2Steps() {
       const gW = (gV / srcTot) * pctTotal;
       const oW = (oV / srcTot) * pctTotal;
       barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
-    } else if (funnelV2Filter.type === 'source') {
-      const color = srcColor(funnelV2Filter.value);
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
     } else {
-      const color = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' }[funnelV2Filter.value] || '#94a3b8';
+      const color = srcColor(funnelV2Filter.source);
       barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
     }
 
@@ -1819,12 +1879,43 @@ function renderTrialBehaviorV2() {
 
 // ── Compare ───────────────────────────────────────────────────────────────
 
+function setCompareFilter(dim, value) {
+  compareFilter = { ...compareFilter, [dim]: value };
+  renderFunnelCompare();
+}
+
+function fmtWindow(since, untilExclusive) {
+  const opts = { day: 'numeric', month: 'short', year: 'numeric' };
+  const a = new Date(since + 'T00:00:00Z');
+  const b = new Date(untilExclusive + 'T00:00:00Z');
+  b.setUTCDate(b.getUTCDate() - 1);
+  return `${a.toLocaleDateString('en-GB', opts)} to ${b.toLocaleDateString('en-GB', opts)}`;
+}
+
 function renderFunnelCompare() {
   const { mb } = state;
   const el = document.getElementById('funnel-compare');
-  if (!mb?.compare) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  if (!mb?.compare_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const c = mb.compare;
+  const cube = mb.compare_cube;
+  renderPills('compare-src-pills', 'source',
+    cubeDimCounts(cube, compareFilter, 'source'), compareFilter.source, 'setCompareFilter', srcLabel);
+  renderPills('compare-dev-pills', 'device',
+    cubeDimCounts(cube, compareFilter, 'device'), compareFilter.device, 'setCompareFilter');
+
+  const lw = mb.legacy_window || { since: '2026-02-01', until: '2026-05-01' };
+  const cols = [
+    { key: 'legacy', label: 'Legacy',          color: 'var(--accent)',
+      sub: `${fmtWindow(lw.since, lw.until)} · fixed`,
+      data: cubeCompare(cube, compareFilter, 'legacy') },
+    { key: 'v2',     label: 'Onboarding v2',   color: 'var(--teal)',
+      sub: 'first session before 27 Aug 2026, 14:00',
+      data: cubeCompare(cube, compareFilter, 'v2') },
+    { key: 'v2.1',   label: 'Onboarding v2.1', color: 'var(--green)',
+      sub: 'first session from 27 Aug 2026, 14:00',
+      data: cubeCompare(cube, compareFilter, 'v2.1') },
+  ];
+
   const pct = (n, base) => base > 0 ? (n / base * 100).toFixed(1) + '%' : '–';
   const bar = (n, base, color) => {
     const w = base > 0 ? Math.round(n / base * 100) : 0;
@@ -1833,88 +1924,79 @@ function renderFunnelCompare() {
   };
 
   const rows = [
-    { label: 'Signups',                 v1: c.v1_signups,         v2: c.v2_signups,         note: 'No v2 session vs has v2 session' },
-    { label: 'Trialing',                v1: c.v1_trialing,        v2: c.v2_trialing,        note: 'Legacy: sub.status = trialing · V2: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
-    { label: 'Active',                  v1: c.v1_active,          v2: c.v2_active,          note: 'sub.status = active' },
-    { label: 'Canceled (during trial)', v1: c.v1_canceled_trial,  v2: c.v2_canceled_trial,  note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
-    { label: 'Canceled (after active)', v1: c.v1_canceled_active, v2: c.v2_canceled_active, note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
+    { key: 'signups',         label: 'Signups',
+      note: 'Legacy: no v2 session. v2 / v2.1: split on the FIRST v2 session, so a contact who signed up earlier and reopened onboarding stays in the cohort they first saw' },
+    { key: 'trialing',        label: 'Trialing',
+      note: 'Legacy: sub.status = trialing. v2 and v2.1: paywall passed (Stripe checkout session or subscription). Until 2026-08-26 that was the same as onboarding completed' },
+    { key: 'active',          label: 'Active',                  note: 'sub.status = active' },
+    { key: 'canceled_trial',  label: 'Canceled (during trial)', note: 'canceled while never paid: status=canceled+no subscribed_at, OR trialing+cancel_at_period_end' },
+    { key: 'canceled_active', label: 'Canceled (after active)', note: 'canceled after paying: status=canceled+subscribed_at, OR active+cancel_at_period_end' },
   ];
 
-  const rowColor = (label, side) => {
-    if (label.startsWith('Canceled')) return 'var(--red)';
-    if (label === 'Active') return 'var(--green)';
-    return side === 'v1' ? 'var(--accent)' : 'var(--teal)';
+  const rowColor = (key, col) => {
+    if (key.startsWith('canceled')) return 'var(--red)';
+    if (key === 'active') return 'var(--green)';
+    return col.color;
   };
 
-  const tableRows = rows.map(r => `
-    <tr style="border-bottom:1px solid var(--border)">
+  const tableRows = rows.map(r => {
+    const cells = cols.map(col => {
+      const val  = col.data[r.key] || 0;
+      const base = col.data.signups || 0;
+      const isSignups = r.key === 'signups';
+      // Under 30 in the denominator a percentage reads as precision that is not
+      // there, so show the count alone.
+      const thin = !isSignups && base < 30;
+      return `<td style="padding:12px 14px;text-align:center">
+        <div style="font-size:16px;font-weight:700">${fmtN(val)}</div>
+        <div style="font-size:11px;color:var(--muted)">${
+          isSignups ? '—' : (thin ? `n=${fmtN(base)}, too few for %` : pct(val, base) + ' of signups')}</div>
+        ${isSignups || thin ? '' : bar(val, base, rowColor(r.key, col))}
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:12px 14px;font-weight:600">${r.label}</td>
-      <td style="padding:12px 14px;text-align:center">
-        <div style="font-size:16px;font-weight:700">${fmtN(r.v1)}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v1, c.v1_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v1, c.v1_signups, rowColor(r.label, 'v1')) : ''}
-      </td>
-      <td style="padding:12px 14px;text-align:center">
-        <div style="font-size:16px;font-weight:700">${fmtN(r.v2)}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.label !== 'Signups' ? pct(r.v2, c.v2_signups) + ' of signups' : '—'}</div>
-        ${r.label !== 'Signups' ? bar(r.v2, c.v2_signups, rowColor(r.label, 'v2')) : ''}
-      </td>
+      ${cells}
       <td style="padding:12px 14px;font-size:11px;color:var(--muted)">${r.note}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+
+  const heads = cols.map(c => `<th style="padding:10px 14px;text-align:center;color:${c.color}">
+      ${c.label}<div style="font-weight:400;font-size:10px;color:var(--muted);margin-top:2px">${c.sub}</div></th>`).join('');
 
   el.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="border-bottom:2px solid var(--border)">
           <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px"></th>
-          <th style="padding:10px 14px;text-align:center;color:var(--accent)">Legacy</th>
-          <th style="padding:10px 14px;text-align:center;color:var(--teal)">Onboarding v2</th>
+          ${heads}
           <th style="padding:10px 14px;text-align:left;color:var(--muted);font-size:11px">Definition</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
-    </table>`;
+    </table>
+    <p class="data-note" style="margin-top:12px">The Legacy column is pinned to a fixed benchmark window and does not follow the date
+    picker. Legacy was 100% of signups in Feb and Mar 2026 and 72.7% in April; from May it is a residual tail of 7 to 20 a month, so inside
+    a recent window the column was noise rather than a population. April is in the window because <code>signup_user_agent</code> only starts
+    being recorded then: 77.2% of Feb and Mar has no device, which is why <strong>unknown</strong> is kept as a visible device pill instead
+    of quietly dropping those contacts. The other two columns follow the date picker.</p>`;
 }
 
 // ══ FUNNEL (LEGACY V1) ════════════════════════════════════════════════════
 
-function setFunnelFilter(type, value) {
-  if (funnelFilter.type === type && funnelFilter.value === value) {
-    funnelFilter = { type: null, value: null };
-  } else {
-    funnelFilter = { type, value };
-  }
-  renderFunnelFilters();
+function setFunnelFilter(dim, value) {
+  funnelFilter = { ...funnelFilter, [dim]: value };
   renderFunnelSteps();
 }
 
 function renderFunnelFilters() {
   const { mb } = state;
   if (!mb) return;
-  const fbs = mb.funnel_by_source || {};
-  const fbd = mb.funnel_by_device || {};
-
-  const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  document.getElementById('funnel-src-pills').innerHTML =
-    ['all', ...srcKeys].map(s => {
-      const isAll = s === 'all';
-      const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'source' && funnelFilter.value === s);
-      const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('source','${s}')`;
-      const lbl    = isAll ? 'All' : srcLabel(s);
-      const n      = isAll ? '' : ` <span style="opacity:.6">${fmtN(fbs[s]?.[0]||0)}</span>`;
-      return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}${n}</button>`;
-    }).join('');
-
-  const devKeys = Object.keys(fbd).filter(k => k !== '_error').sort((a, b) => (fbd[b]?.[0]||0) - (fbd[a]?.[0]||0));
-  document.getElementById('funnel-dev-pills').innerHTML = devKeys.length
-    ? ['all', ...devKeys].map(d => {
-        const isAll = d === 'all';
-        const active = isAll ? funnelFilter.type === null : (funnelFilter.type === 'device' && funnelFilter.value === d);
-        const click  = isAll ? `setFunnelFilter(null,null)` : `setFunnelFilter('device','${d}')`;
-        const lbl    = isAll ? 'All' : (d.charAt(0).toUpperCase() + d.slice(1));
-        return `<button class="filter-pill ${active ? 'active' : ''}" onclick="${click}">${lbl}</button>`;
-      }).join('')
-    : '<span style="font-size:11px;color:var(--muted)">loading…</span>';
+  const cube = mb.funnel_cube || [];
+  renderPills('funnel-src-pills', 'source',
+    cubeDimCounts(cube, funnelFilter, 'source'), funnelFilter.source, 'setFunnelFilter', srcLabel);
+  renderPills('funnel-dev-pills', 'device',
+    cubeDimCounts(cube, funnelFilter, 'device'), funnelFilter.device, 'setFunnelFilter');
 }
 
 function renderFunnelSteps() {
@@ -1924,19 +2006,20 @@ function renderFunnelSteps() {
 
   renderFunnelFilters();
 
-  // Pick steps array based on active filter
-  let steps;
-  if (funnelFilter.type === 'source') {
-    steps = mb.funnel_by_source?.[funnelFilter.value] || mb.funnel.steps;
-  } else if (funnelFilter.type === 'device') {
-    steps = mb.funnel_by_device?.[funnelFilter.value] || mb.funnel.steps;
-  } else {
-    steps = mb.funnel.steps;
-  }
-
+  const cube  = mb.funnel_cube || [];
+  const steps = cube.length ? cubeSteps(cube, funnelFilter) : mb.funnel.steps;
   const total = steps[0] || 1;
-  // Only show source bar segments when no filter is active
-  const fbs = funnelFilter.type === null ? (mb.funnel_by_source || {}) : {};
+
+  // Source segments only while the source is unfiltered.
+  const splitBySource = funnelFilter.source === 'all';
+  const fbs = {};
+  if (splitBySource) {
+    for (const r of cube) {
+      if (!cubeMatch(r, { ...funnelFilter, source: 'all' })) continue;
+      if (!fbs[r.source]) fbs[r.source] = Array(9).fill(0);
+      r.steps.forEach((v, i) => { fbs[r.source][i] += v; });
+    }
+  }
 
   const rows = [
     { label: 'Step 1 — Signup',               val: steps[0], idx: 0 },
@@ -1958,8 +2041,8 @@ function renderFunnelSteps() {
 
     // Bar fill: solid color when filtered, multi-source segments when unfiltered
     let barInner;
-    if (funnelFilter.type === null) {
-      // No filter — segmented by source
+    if (splitBySource) {
+      // Source unfiltered — segmented by source
       let mW = pctTotal, gW = 0, oW = 0; // fallback: solid accent
       if (row.idx !== null) {
         const mV = fbs.meta?.[row.idx]   || 0;
@@ -1973,11 +2056,8 @@ function renderFunnelSteps() {
       }
       barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
     } else {
-      // Filter active — single solid bar
-      const color = funnelFilter.type === 'source'
-        ? srcColor(funnelFilter.value)
-        : { desktop: '#14b8a6', mobile: '#f59e0b', tablet: '#8b5cf6', unknown: '#94a3b8' }[funnelFilter.value] || '#94a3b8';
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+      // Single source picked — solid bar in that source's colour
+      barInner = `<div style="flex:1;background:${srcColor(funnelFilter.source)};border-radius:4px"></div>`;
     }
 
     return `<div class="funnel-step">
