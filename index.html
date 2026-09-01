@@ -346,30 +346,38 @@
   <p class="tab-goal"><strong>Goal:</strong> Find leaking buckets — which steps lose the most users, and does the drop vary by acquisition channel? Compare new (V2) vs legacy onboarding performance.</p>
 
   <nav class="funnel-sub-nav">
-    <button class="active" onclick="switchFunnelTab('v2')">Onboarding v2</button>
+    <button class="active" onclick="switchFunnelTab('v21')">Onboarding v2.1</button>
+    <button onclick="switchFunnelTab('v2')">Onboarding v2</button>
     <button onclick="switchFunnelTab('v1')">Legacy Onboarding</button>
     <button onclick="switchFunnelTab('compare')">Compare</button>
   </nav>
 
-  <!-- ── V2 Panel ── -->
-  <div id="funnel-v2-panel" class="funnel-panel active">
+  <!-- ── V2.1 Panel ── -->
+  <div id="funnel-v21-panel" class="funnel-panel active">
     <div class="section-card">
-      <h3>Onboarding v2 Funnel — 8 steps, unique by email</h3>
-      <p class="data-note" id="funnel-v2-paywall-note"><strong>Product change on 27 Aug 2026: the paywall moved to after onboarding.</strong>
-      Until 26 Aug, reaching the end of onboarding required entering a card, so "onboarding done" and "trial started"
-      were the same moment. From 27 Aug a contact finishes onboarding and gets into the app with no card, and hits the
-      paywall later, when they try to start the trial.
-      <br><br>
-      <strong>Step 8 (Trial) is comparable across that date</strong>: it means "passed the paywall" both before and after,
-      keyed on the Stripe checkout session, which survives cancellation. Steps 1 to 6 and step 9 are unchanged too.
-      <strong>Step 7 is not a trend line across 27 Aug</strong>: before that date it holds contacts stopped AT the Stripe
-      checkout who never entered the app, and after it, contacts inside the app with no card. The two never overlap in
-      time, so it is a clean handover on a known date rather than a mixture.
-      <br><br>
-      Practical consequence: any movement in <strong>Signup&rarr;Trial</strong> from the week of 31 Aug is driven by the
-      paywall move, not by the ad campaigns that started that same week.</p>
+      <h3>Onboarding v2.1 Funnel — 9 steps, unique by email</h3>
+      <p class="data-note"><strong>Contacts whose first onboarding session started on or after 27 Aug 2026, 14:00</strong>,
+      the release that moved the paywall to after onboarding. Measured the way we measure now: step 7 is finishing
+      onboarding and getting into the app with no card, and step 8 is passing the paywall, keyed on the Stripe checkout
+      session so it survives a cancellation.</p>
+      <div id="funnel-v21-filters" style="margin-bottom:14px">
+        <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v21-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+        <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v21-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
+      </div>
+      <div id="funnel-v21-steps"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ── V2 Panel ── -->
+  <div id="funnel-v2-panel" class="funnel-panel">
+    <div class="section-card">
+      <h3>Onboarding v2 Funnel — 9 steps, unique by email</h3>
+      <p class="data-note"><strong>Contacts whose first onboarding session started before 27 Aug 2026, 14:00.</strong>
+      Measured the way this version was measured at the time: until 26 Aug, reaching the end of onboarding required
+      entering a card, so finishing onboarding WAS starting the trial. Step 8 is therefore "onboarding completed" and
+      step 7 the contacts who reached the Stripe checkout and went no further. Today's paywall-based definition is not
+      retro-fitted here, it lives on the Onboarding v2.1 tab.</p>
       <div id="funnel-v2-filters" style="margin-bottom:14px">
-        <div class="filter-row"><span class="filter-label">Onboarding</span><div id="funnel-v2-coh-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Source</span><div id="funnel-v2-src-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
         <div class="filter-row"><span class="filter-label">Device</span><div id="funnel-v2-dev-pills" style="display:flex;gap:4px;flex-wrap:wrap"></div></div>
       </div>
@@ -402,11 +410,11 @@
       <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
-      <h3>Onboarding v2 — Conversion Rates Over Time</h3>
+      <h3>Conversion Rates Over Time — all v2 sessions (v2 and v2.1)</h3>
       <canvas id="v2-conversion-chart" height="90"></canvas>
     </div>
     <div class="section-card">
-      <h3>Onboarding v2 — Trial Behaviour</h3>
+      <h3>Trial Behaviour — all v2 sessions (v2 and v2.1)</h3>
       <div id="trial-behavior-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
@@ -537,9 +545,10 @@ let annotationsV2Data = {}; // same shape — Onboarding V2 chart (independent)
 let currentAnnotNamespace = 'all'; // tracks which chart opened the annotation modal
 // Independent per dimension: picking a device no longer clears the source.
 let funnelFilter    = { source: 'all', device: 'all' };
-let funnelV2Filter  = { source: 'all', device: 'all', cohort: 'all' };
+let funnelV2Filter  = { source: 'all', device: 'all', cohort: 'v2' };
+let funnelV21Filter = { source: 'all', device: 'all', cohort: 'v2.1' };
 let compareFilter   = { source: 'all', device: 'all' };
-let activeFunnelTab = 'v2';
+let activeFunnelTab = 'v21';
 
 // Date picker state
 let dp = { unit: 'week', mode: 'last_n', n: 6 };
@@ -642,6 +651,26 @@ function cubeDimCounts(cube, f, dim) {
     counts[r[dim]] = (counts[r[dim]] || 0) + n;
   }
   return counts;
+}
+
+// Legend for the stacked funnel bars. The bars have exactly three segments, and
+// the third one is everything that is not Meta and not Google (organic, taaft,
+// chatgpt.com and friends), so it is named for what it holds rather than
+// "Organic". Only the segments actually present are listed, so picking a cohort
+// with no Google traffic does not show a Google swatch.
+function sourceLegend(fbs) {
+  const other = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google');
+  const items = [
+    { on: (fbs.meta?.[0] || 0) > 0,   color: 'var(--meta)',    label: 'Meta' },
+    { on: (fbs.google?.[0] || 0) > 0, color: 'var(--google)',  label: 'Google Ads' },
+    { on: other.some(k => (fbs[k]?.[0] || 0) > 0), color: 'var(--organic)',
+      label: other.length > 1 ? 'Organic and other' : 'Organic' },
+  ].filter(i => i.on);
+  if (items.length < 2) return '';
+  return `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)">`
+    + items.map(i => `<span style="display:inline-flex;align-items:center;gap:5px">`
+      + `<span style="width:9px;height:9px;border-radius:2px;background:${i.color};display:inline-block"></span>${i.label}</span>`).join('')
+    + `</div>`;
 }
 
 function renderPills(elId, dim, counts, current, setter, labelFn) {
@@ -1537,7 +1566,7 @@ function renderTables() {
 function switchFunnelTab(tab) {
   activeFunnelTab = tab;
   document.querySelectorAll('.funnel-sub-nav button').forEach((b, i) => {
-    const tabs = ['v2', 'v1', 'compare'];
+    const tabs = ['v21', 'v2', 'v1', 'compare'];
     b.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.funnel-panel').forEach(p => p.classList.remove('active'));
@@ -1546,77 +1575,94 @@ function switchFunnelTab(tab) {
 
 // ── V2 Funnel ─────────────────────────────────────────────────────────────
 
+// The v2 and v2.1 tabs are the same funnel read two ways, so one renderer serves
+// both. Each tab is pinned to its cohort and to the measurement that was in force
+// for that cohort: v2 the pre-27-Aug definition, v2.1 today's paywall-based one.
+const V2_TABS = {
+  'v2.1': {
+    filter: () => funnelV21Filter, setter: 'setFunnelV21Filter', stepsKey: 'steps',
+    elId: 'funnel-v21-steps', src: 'funnel-v21-src-pills', dev: 'funnel-v21-dev-pills',
+    step7: 'Step 7 — Onboarding done, no card',
+    step8: 'Step 8 — Trial (paywall passed)',
+  },
+  'v2': {
+    filter: () => funnelV2Filter, setter: 'setFunnelV2Filter', stepsKey: 'steps_pre827',
+    elId: 'funnel-v2-steps', src: 'funnel-v2-src-pills', dev: 'funnel-v2-dev-pills',
+    step7: 'Step 7 — Reached Stripe checkout',
+    step8: 'Step 8 — Trial (onboarding completed)',
+  },
+};
+
+// Breakdown maps for the secondary sections inside a cohort's tab, derived from
+// the cube so they read the same cohort and the same measurement as the funnel
+// above them. Without this they silently aggregated v2 and v2.1 together while
+// sitting under a tab named for one of them.
+function v2Breakdown(cohort, dim) {
+  const { mb } = state;
+  const cfg = V2_TABS[cohort];
+  const out = {};
+  for (const r of mb?.funnel_v2_cube || []) {
+    if (r.cohort !== cohort) continue;
+    const steps = r[cfg.stepsKey] || r.steps;
+    if (!out[r[dim]]) out[r[dim]] = Array(9).fill(0);
+    steps.forEach((v, i) => { out[r[dim]][i] += v; });
+  }
+  return out;
+}
+
 function setFunnelV2Filter(dim, value) {
   funnelV2Filter = { ...funnelV2Filter, [dim]: value };
-  renderFunnelV2Steps();
+  renderV2Funnel('v2');
 }
 
-function renderFunnelV2Filters() {
-  const { mb } = state;
-  if (!mb) return;
-  const cube = mb.funnel_v2_cube || [];
-  renderPills('funnel-v2-coh-pills', 'cohort',
-    cubeDimCounts(cube, funnelV2Filter, 'cohort'), funnelV2Filter.cohort, 'setFunnelV2Filter', cohortLabel);
-  renderPills('funnel-v2-src-pills', 'source',
-    cubeDimCounts(cube, funnelV2Filter, 'source'), funnelV2Filter.source, 'setFunnelV2Filter', srcLabel);
-  renderPills('funnel-v2-dev-pills', 'device',
-    cubeDimCounts(cube, funnelV2Filter, 'device'), funnelV2Filter.device, 'setFunnelV2Filter');
-
-  // The paywall-move explainer only earns its space when both cohorts are mixed
-  // into one funnel. Pick one and the steps mean one thing, so it is just noise.
-  const note = document.getElementById('funnel-v2-paywall-note');
-  if (note) note.style.display = funnelV2Filter.cohort === 'all' ? '' : 'none';
+function setFunnelV21Filter(dim, value) {
+  funnelV21Filter = { ...funnelV21Filter, [dim]: value };
+  renderV2Funnel('v2.1');
 }
 
-function renderFunnelV2Steps() {
+function renderV2Funnel(cohort) {
   const { mb } = state;
-  const el = document.getElementById('funnel-v2-steps');
-  if (!mb?.funnel_v2?.steps) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  const cfg = V2_TABS[cohort];
+  const el  = document.getElementById(cfg.elId);
+  if (!el) return;
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  renderFunnelV2Filters();
+  const f    = cfg.filter();
+  const cube = mb.funnel_v2_cube.filter(r => r.cohort === cohort)
+    .map(r => ({ ...r, steps: r[cfg.stepsKey] || r.steps }));
 
-  const cube  = mb.funnel_v2_cube || [];
-  const steps = cube.length ? cubeSteps(cube, funnelV2Filter) : mb.funnel_v2.steps;
+  renderPills(cfg.src, 'source', cubeDimCounts(cube, f, 'source'), f.source, cfg.setter, srcLabel);
+  renderPills(cfg.dev, 'device', cubeDimCounts(cube, f, 'device'), f.device, cfg.setter);
+
+  const steps = cubeSteps(cube, f);
   const total = steps[0] || 1;
 
-  // Step 7 is the one step that does not mean the same thing on both sides of the
-  // 27 Aug release. Before it, finishing onboarding required a card, so reaching
-  // the end of the flow meant arriving at the Stripe checkout. After it, a contact
-  // finishes and gets into the app with no card. Neither wording is true of both,
-  // so the label follows whichever cohort is selected.
-  const STEP7 = {
-    'v2':   'Step 7 — Reached Stripe checkout',
-    'v2.1': 'Step 7 — Onboarding done, no card',
-    'all':  'Step 7 — Onboarding done, no card / reached checkout',
-  }[funnelV2Filter.cohort] || 'Step 7 — Onboarding done, no card / reached checkout';
-
-  // Colour the bars by source only while the source is unfiltered: once a single
-  // source is picked the split has nothing left to show.
-  const splitBySource = funnelV2Filter.source === 'all';
+  // Source segments only while the source is unfiltered.
+  const splitBySource = f.source === 'all';
   const fbs = {};
   if (splitBySource) {
     for (const r of cube) {
-      if (!cubeMatch(r, { ...funnelV2Filter, source: 'all' })) continue;
+      if (!cubeMatch(r, { ...f, source: 'all' })) continue;
       if (!fbs[r.source]) fbs[r.source] = Array(9).fill(0);
       r.steps.forEach((v, i) => { fbs[r.source][i] += v; });
     }
   }
 
   const rows = [
-    { label: 'Step 1 — Email Confirmed',     val: steps[0], idx: 0 },
-    { label: 'Step 2 — Domain Provided',     val: steps[1], idx: 1 },
-    { label: 'Step 3 — Business Details',    val: steps[2], idx: 2 },
-    { label: 'Step 4 — ICP Accepted',        val: steps[3], idx: 3 },
-    { label: 'Step 5 — Channels Accepted',   val: steps[4], idx: 4 },
-    { label: 'Step 6 — Sequence Accepted',   val: steps[5], idx: 5 },
-    { label: STEP7,                          val: steps[6], idx: 6 },
-    { label: 'Step 8 — Trial (card in)',     val: steps[7], idx: 7 },
-    { label: 'Step 9 — Active',              val: steps[8] || 0, idx: 8 },
+    { label: 'Step 1 — Email Confirmed',   val: steps[0], idx: 0 },
+    { label: 'Step 2 — Domain Provided',   val: steps[1], idx: 1 },
+    { label: 'Step 3 — Business Details',  val: steps[2], idx: 2 },
+    { label: 'Step 4 — ICP Accepted',      val: steps[3], idx: 3 },
+    { label: 'Step 5 — Channels Accepted', val: steps[4], idx: 4 },
+    { label: 'Step 6 — Sequence Accepted', val: steps[5], idx: 5 },
+    { label: cfg.step7,                    val: steps[6], idx: 6 },
+    { label: cfg.step8,                    val: steps[7], idx: 7 },
+    { label: 'Step 9 — Active',            val: steps[8] || 0, idx: 8 },
   ];
 
   el.innerHTML = rows.map((row, i) => {
-    const val     = row.val || 0;
-    const prevVal = i === 0 ? total : (rows[i - 1].val || 1);
+    const val      = row.val || 0;
+    const prevVal  = i === 0 ? total : (rows[i - 1].val || 1);
     const pctTotal = Math.round((val / total) * 100);
     const dropPct  = i > 0 ? Math.round(((prevVal - val) / prevVal) * 100) : null;
 
@@ -1625,15 +1671,13 @@ function renderFunnelV2Steps() {
       const mV = fbs.meta?.[row.idx]   || 0;
       const gV = fbs.google?.[row.idx] || 0;
       const oV = Object.keys(fbs).filter(k => k !== 'meta' && k !== 'google')
-                  .reduce((s, k) => s + (fbs[k]?.[row.idx] || 0), 0);
+                  .reduce((sum, k) => sum + (fbs[k]?.[row.idx] || 0), 0);
       const srcTot = mV + gV + oV || 1;
-      const mW = (mV / srcTot) * pctTotal;
-      const gW = (gV / srcTot) * pctTotal;
-      const oW = (oV / srcTot) * pctTotal;
-      barInner = `<div class="seg-meta" style="flex:${mW}"></div><div class="seg-google" style="flex:${gW}"></div><div class="seg-organic" style="flex:${oW}"></div>`;
+      barInner = `<div class="seg-meta" style="flex:${(mV / srcTot) * pctTotal}"></div>`
+               + `<div class="seg-google" style="flex:${(gV / srcTot) * pctTotal}"></div>`
+               + `<div class="seg-organic" style="flex:${(oV / srcTot) * pctTotal}"></div>`;
     } else {
-      const color = srcColor(funnelV2Filter.source);
-      barInner = `<div style="flex:1;background:${color};border-radius:4px"></div>`;
+      barInner = `<div style="flex:1;background:${srcColor(f.source)};border-radius:4px"></div>`;
     }
 
     return `<div class="funnel-step">
@@ -1649,15 +1693,21 @@ function renderFunnelV2Steps() {
         <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + sourceLegend(fbs);
+}
+
+// Kept as the name the data-load path calls.
+function renderFunnelV2Steps() {
+  renderV2Funnel('v2.1');
+  renderV2Funnel('v2');
 }
 
 function renderSourceGridV2() {
   const { mb } = state;
   const el = document.getElementById('source-grid-v2');
-  if (!mb?.funnel_v2_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const fbs = mb.funnel_v2_by_source;
+  const fbs = v2Breakdown('v2', 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
   const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
 
@@ -1691,7 +1741,7 @@ function renderDeviceGridV2() {
   const { mb } = state;
   const el = document.getElementById('device-grid-v2');
   if (!el) return;
-  const fbd = mb?.funnel_v2_by_device;
+  const fbd = v2Breakdown('v2', 'device');
   if (!fbd || Object.keys(fbd).length === 0) { el.innerHTML = '<p class="no-data">No device data</p>'; return; }
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
@@ -1723,9 +1773,9 @@ function renderDeviceGridV2() {
 function renderSourceTableV2() {
   const { mb } = state;
   const el = document.getElementById('source-table-v2');
-  if (!mb?.funnel_v2_by_source) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+  if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
-  const fbs     = mb.funnel_v2_by_source;
+  const fbs     = v2Breakdown('v2', 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
 
   const rows = srcKeys.map(key => {
@@ -2073,7 +2123,7 @@ function renderFunnelSteps() {
         <div class="funnel-bar-inner" style="width:${pctTotal}%">${barInner}</div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + sourceLegend(fbs);
 }
 
 function renderSourceGrid() {

@@ -577,17 +577,29 @@ export async function onRequest(context) {
         ELSE 0
       END
     `;
-    const V2_COUNTS = `
-      COUNT(*) FILTER (WHERE step_num >= 1) AS s1,
-      COUNT(*) FILTER (WHERE step_num >= 2) AS s2,
-      COUNT(*) FILTER (WHERE step_num >= 3) AS s3,
-      COUNT(*) FILTER (WHERE step_num >= 4) AS s4,
-      COUNT(*) FILTER (WHERE step_num >= 5) AS s5,
-      COUNT(*) FILTER (WHERE step_num >= 6) AS s6,
-      COUNT(*) FILTER (WHERE step_num >= 7) AS s7,
-      COUNT(*) FILTER (WHERE step_num >= 8) AS s8,
-      COUNT(*) FILTER (WHERE step_num >= 9) AS s9
+
+    // The measurement in force BEFORE the 2026-08-27 14:00 release. Back then,
+    // reaching state='completed' required entering a card, so 'completed' WAS the
+    // trial marker and 'moved_to_stripe' was the step below it. Kept so the
+    // Onboarding v2 tab reads that cohort the way it was read at the time,
+    // instead of retro-fitting today's paywall-based definition onto it.
+    const V2_STEP_PRE827 = `
+      CASE
+        WHEN ${EVER_ACTIVE}                        THEN 9
+        WHEN s.state = 'completed'                 THEN 8
+        WHEN s.state = 'moved_to_stripe'           THEN 7
+        WHEN s.state = 'sequence_accepted'         THEN 6
+        WHEN s.state = 'channels_accepted'         THEN 5
+        WHEN s.state = 'icp_accepted'              THEN 4
+        WHEN s.state = 'business_details_accepted' THEN 3
+        WHEN s.state = 'domain_provided'           THEN 2
+        WHEN s.state = 'email_confirmed'           THEN 1
+        ELSE 0
+      END
     `;
+    const V2_COUNTS_OF = (col, sfx) => [1,2,3,4,5,6,7,8,9]
+      .map(n => `COUNT(*) FILTER (WHERE ${col} >= ${n}) AS s${n}${sfx}`).join(',\n      ');
+    const V2_COUNTS = V2_COUNTS_OF('step_num', '');
     const V2_BASE = `
       FROM companies
       JOIN LATERAL (
@@ -612,22 +624,30 @@ export async function onRequest(context) {
       // breakdowns. Two breakdowns cannot answer "meta AND desktop", which is why
       // picking a device used to wipe the source. Cardinality is ~2x5x4 rows of
       // nine counts, so the client aggregates over whatever is set to "all".
+      // Each row carries the funnel under BOTH measurements: `steps` is today's
+      // paywall-based definition and `steps_pre827` the one in force before the
+      // 27 Aug release. The Onboarding v2 tab reads its cohort the way it was
+      // read at the time; the v2.1 tab reads its own the way we read it now.
       const fv2Rows = await runSQL(env, `
         WITH raw AS (
           SELECT u.email,
-            ${COHORT_CASE('f')} AS cohort,
-            ${SOURCE_CASE}      AS source,
-            ${DEVICE_CASE}      AS device,
-            MAX(${V2_STEP})     AS step_num
+            ${COHORT_CASE('f')}        AS cohort,
+            ${SOURCE_CASE}             AS source,
+            ${DEVICE_CASE}             AS device,
+            MAX(${V2_STEP})            AS step_num,
+            MAX(${V2_STEP_PRE827})     AS step_pre
           ${V2_BASE} GROUP BY u.email, cohort, source, device
         )
-        SELECT cohort, source, device, ${V2_COUNTS}
+        SELECT cohort, source, device,
+          ${V2_COUNTS_OF('step_num', '')},
+          ${V2_COUNTS_OF('step_pre', 'p')}
         FROM raw GROUP BY cohort, source, device ORDER BY s1 DESC
       `);
       const v2Totals = Array(9).fill(0);
       for (const [cohort, source, device, ...counts] of fv2Rows) {
-        const steps = counts.map(Number);
-        funnel_v2_cube.push({ cohort, source, device, steps });
+        const steps        = counts.slice(0, 9).map(Number);
+        const steps_pre827 = counts.slice(9, 18).map(Number);
+        funnel_v2_cube.push({ cohort, source, device, steps, steps_pre827 });
         steps.forEach((v, i) => { v2Totals[i] += v; });
         if (!funnel_v2_by_source[source]) funnel_v2_by_source[source] = Array(9).fill(0);
         if (!funnel_v2_by_device[device]) funnel_v2_by_device[device] = Array(9).fill(0);
