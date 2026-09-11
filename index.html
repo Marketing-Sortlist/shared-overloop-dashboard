@@ -279,8 +279,8 @@
     <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
       <h3 style="margin:0">Cost per Outcome — Evolution (Combined)</h3>
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="lang-pill active" data-cpo="blended" onclick="setCpoMode('blended')">Blended</button>
-        <button class="lang-pill" data-cpo="paid" onclick="setCpoMode('paid')">Only paid</button>
+        <button class="lang-pill active" data-cpo="blended" title="Blended: paid spend divided by ALL conversions of the period, organic and SEO included. It answers what the business really pays per outcome, since the ads also lift the unpaid channels." onclick="setCpoMode('blended')">Blended</button>
+        <button class="lang-pill" data-cpo="paid" title="Only paid: paid spend divided by the conversions attributed to Meta and Google alone. It answers how the ads perform on their own, ignoring everything they did not bring in." onclick="setCpoMode('paid')">Only paid</button>
       </div>
     </div>
     <div class="chart-wrap"><canvas id="costEvolutionChart"></canvas></div>
@@ -291,8 +291,8 @@
       <h3 style="margin:0">Cost per Outcome — by Period &amp; Channel</h3>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:var(--muted)">Combined</span>
-        <button class="lang-pill active" data-cpo="blended" onclick="setCpoMode('blended')">Blended</button>
-        <button class="lang-pill" data-cpo="paid" onclick="setCpoMode('paid')">Only paid</button>
+        <button class="lang-pill active" data-cpo="blended" title="Blended: paid spend divided by ALL conversions of the period, organic and SEO included. It answers what the business really pays per outcome, since the ads also lift the unpaid channels." onclick="setCpoMode('blended')">Blended</button>
+        <button class="lang-pill" data-cpo="paid" title="Only paid: paid spend divided by the conversions attributed to Meta and Google alone. It answers how the ads perform on their own, ignoring everything they did not bring in." onclick="setCpoMode('paid')">Only paid</button>
       </div>
     </div>
     <div id="cost-by-period"><div class="loading"><div class="spinner"></div></div></div>
