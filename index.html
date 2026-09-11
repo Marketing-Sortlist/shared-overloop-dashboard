@@ -276,12 +276,25 @@
   </div>
 
   <div class="section-card">
-    <h3>Cost per Outcome — Evolution (Combined paid)</h3>
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+      <h3 style="margin:0">Cost per Outcome — Evolution (Combined)</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="lang-pill active" data-cpo="blended" title="Blended: paid spend divided by ALL conversions of the period, organic and SEO included. It answers what the business really pays per outcome, since the ads also lift the unpaid channels." onclick="setCpoMode('blended')">Blended</button>
+        <button class="lang-pill" data-cpo="paid" title="Only paid: paid spend divided by the conversions attributed to Meta and Google alone. It answers how the ads perform on their own, ignoring everything they did not bring in." onclick="setCpoMode('paid')">Only paid</button>
+      </div>
+    </div>
     <div class="chart-wrap"><canvas id="costEvolutionChart"></canvas></div>
   </div>
 
   <div class="section-card" style="overflow-x:auto">
-    <h3>Cost per Outcome — by Period &amp; Channel</h3>
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+      <h3 style="margin:0">Cost per Outcome — by Period &amp; Channel</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Combined</span>
+        <button class="lang-pill active" data-cpo="blended" title="Blended: paid spend divided by ALL conversions of the period, organic and SEO included. It answers what the business really pays per outcome, since the ads also lift the unpaid channels." onclick="setCpoMode('blended')">Blended</button>
+        <button class="lang-pill" data-cpo="paid" title="Only paid: paid spend divided by the conversions attributed to Meta and Google alone. It answers how the ads perform on their own, ignoring everything they did not bring in." onclick="setCpoMode('paid')">Only paid</button>
+      </div>
+    </div>
     <div id="cost-by-period"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 
@@ -572,6 +585,14 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let currentGranularity = 'week';
+
+// Combined series of the two "Cost per Outcome" surfaces, Evolution and by Period.
+//   blended   = paid spend over ALL conversions, organic/SEO included. Default,
+//               because that is the cost the business actually pays per outcome.
+//   paid      = paid spend over the conversions attributed to Meta + Google only.
+// Spend is identical in both, there is no organic spend to add: what changes is
+// the denominator of every Cost/ row.
+let cpoMode = 'blended';
 let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
@@ -1201,35 +1222,48 @@ function renderCostEvolution() {
   const cSig = [], cTrl = [], cAct = [];
   const nSig = [], nTrl = [], nAct = [];
   const nSigMeta = [], nSigGoogle = [], nTrlMeta = [], nTrlGoogle = [], nActMeta = [], nActGoogle = [];
+  const nSigOrg = [], nTrlOrg = [], nActOrg = [];
+
+  // Everything that is neither Meta nor Google: organic/SEO plus the smaller
+  // unpaid referrers. Counted in the denominators only in blended mode.
+  const organicOf = (m) => Object.keys(m)
+    .filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count')
+    .reduce((sum, k) => sum + (m[k] || 0), 0);
 
   for (const date of dates) {
     const spend   = (mByD[date]||0) + (gByD[date]||0);
     const sigs    = sigsByD[date] || {};
     const mSig = sigs.meta||0, gSig = sigs.google||0;
-    const paidSig = mSig + gSig;
     const mTrl = (trlsByD[date]||{}).meta||0, gTrl = (trlsByD[date]||{}).google||0;
-    const trl  = mTrl + gTrl;
     const mAct = (actsByD[date]||{}).meta||0, gAct = (actsByD[date]||{}).google||0;
-    const act  = mAct + gAct;
+
+    const blended = cpoMode === 'blended';
+    const oSig = blended ? organicOf(sigs)                  : 0;
+    const oTrl = blended ? organicOf(trlsByD[date] || {})   : 0;
+    const oAct = blended ? organicOf(actsByD[date] || {})   : 0;
+
+    const paidSig = mSig + gSig + oSig;
+    const trl     = mTrl + gTrl + oTrl;
+    const act     = mAct + gAct + oAct;
 
     cSig.push(spend > 0 && paidSig > 0 ? Math.round(spend / paidSig * 100)/100 : null);
     cTrl.push(spend > 0 && trl > 0     ? Math.round(spend / trl     * 100)/100 : null);
     cAct.push(spend > 0 && act > 0     ? Math.round(spend / act     * 100)/100 : null);
 
-    nSig.push(paidSig); nSigMeta.push(mSig); nSigGoogle.push(gSig);
-    nTrl.push(trl);     nTrlMeta.push(mTrl); nTrlGoogle.push(gTrl);
-    nAct.push(act);     nActMeta.push(mAct); nActGoogle.push(gAct);
+    nSig.push(paidSig); nSigMeta.push(mSig); nSigGoogle.push(gSig); nSigOrg.push(oSig);
+    nTrl.push(trl);     nTrlMeta.push(mTrl); nTrlGoogle.push(gTrl); nTrlOrg.push(oTrl);
+    nAct.push(act);     nActMeta.push(mAct); nActGoogle.push(gAct); nActOrg.push(oAct);
   }
 
   const datasets = [
     // Volume bars — right axis
-    { type: 'bar', label: '#Signups', data: nSig, metaData: nSigMeta, googleData: nSigGoogle,
+    { type: 'bar', label: '#Signups', data: nSig, metaData: nSigMeta, googleData: nSigGoogle, organicData: nSigOrg,
       backgroundColor: 'rgba(79,142,247,0.22)', borderColor: 'rgba(79,142,247,0.5)', borderWidth: 1,
       yAxisID: 'y1', order: 2 },
-    { type: 'bar', label: '#Trials',  data: nTrl, metaData: nTrlMeta, googleData: nTrlGoogle,
+    { type: 'bar', label: '#Trials',  data: nTrl, metaData: nTrlMeta, googleData: nTrlGoogle, organicData: nTrlOrg,
       backgroundColor: 'rgba(245,158,11,0.20)', borderColor: 'rgba(245,158,11,0.45)', borderWidth: 1,
       yAxisID: 'y1', order: 2, hidden: true },
-    { type: 'bar', label: '#Active',  data: nAct, metaData: nActMeta, googleData: nActGoogle,
+    { type: 'bar', label: '#Active',  data: nAct, metaData: nActMeta, googleData: nActGoogle, organicData: nActOrg,
       backgroundColor: 'rgba(34,197,94,0.18)',  borderColor: 'rgba(34,197,94,0.4)',  borderWidth: 1,
       yAxisID: 'y1', order: 2, hidden: true },
     // Cost lines — left axis
@@ -1253,7 +1287,10 @@ function renderCostEvolution() {
             const i = item.dataIndex;
             const m = item.dataset.metaData?.[i] ?? 0;
             const g = item.dataset.googleData?.[i] ?? 0;
-            return ` ${item.dataset.label}: ${item.parsed.y}  (Meta: ${m} · Google: ${g})`;
+            const o = item.dataset.organicData?.[i] ?? 0;
+            const parts = [`Meta: ${m}`, `Google: ${g}`];
+            if (cpoMode === 'blended') parts.push(`Organic: ${o}`);
+            return ` ${item.dataset.label}: ${item.parsed.y}  (${parts.join(', ')})`;
           }
           const v = item.parsed.y;
           return v != null ? ` ${item.dataset.label}: €${v.toFixed(2)}` : ` ${item.dataset.label}: –`;
@@ -1367,7 +1404,17 @@ function renderCostByPeriod() {
     const organicAct  = organicKeys.reduce((s, k) => s + (acts[k]||0), 0);
     const organicCan  = organicCanKeys.reduce((s, k) => s + (cans[k]||0), 0);
     byDate[date] = {
-      combined: { spend: mS+gS, sig:(sigs.meta||0)+(sigs.google||0), trl:(trls.meta||0)+(trls.google||0), act:(acts.meta||0)+(acts.google||0), can:(cans.meta||0)+(cans.google||0) },
+      combined: cpoMode === 'blended'
+        ? { spend: mS+gS,
+            sig:(sigs.meta||0)+(sigs.google||0)+organicSig,
+            trl:(trls.meta||0)+(trls.google||0)+organicTrl,
+            act:(acts.meta||0)+(acts.google||0)+organicAct,
+            can:(cans.meta||0)+(cans.google||0)+organicCan }
+        : { spend: mS+gS,
+            sig:(sigs.meta||0)+(sigs.google||0),
+            trl:(trls.meta||0)+(trls.google||0),
+            act:(acts.meta||0)+(acts.google||0),
+            can:(cans.meta||0)+(cans.google||0) },
       meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0,   can: cans.meta||0   },
       google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0, can: cans.google||0 },
       organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct,     can: organicCan     },
@@ -1376,7 +1423,7 @@ function renderCostByPeriod() {
 
   // Sections: Combined, Meta, Google Ads, Organic
   const sections = [
-    { key: 'combined', label: 'Combined (paid)', color: 'var(--teal)',     hasPaid: true  },
+    { key: 'combined', label: 'Combined',        color: 'var(--teal)',     hasPaid: true  },
     { key: 'meta',     label: 'Meta',            color: 'var(--meta)',     hasPaid: true  },
     { key: 'google',   label: 'Google Ads',      color: 'var(--google)',   hasPaid: true  },
     { key: 'organic',  label: 'Organic',         color: 'var(--organic)',  hasPaid: false },
@@ -2502,6 +2549,13 @@ async function loadLocalisation() {
     document.getElementById('lang-charts').innerHTML  = '';
     document.getElementById('lang-cohort').innerHTML  = '';
   }
+}
+
+function setCpoMode(m) {
+  cpoMode = m;
+  document.querySelectorAll('[data-cpo]').forEach(b => b.classList.toggle('active', b.dataset.cpo === m));
+  renderCostEvolution();
+  renderCostByPeriod();
 }
 
 function setCohortGranularity(g, btn) {
