@@ -281,7 +281,14 @@
   </div>
 
   <div class="section-card" style="overflow-x:auto">
-    <h3>Cost per Outcome — by Period &amp; Channel</h3>
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+      <h3 style="margin:0">Cost per Outcome — by Period &amp; Channel</h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Combined</span>
+        <button class="lang-pill active" id="cpo-mode-blended" onclick="setCpoMode('blended',this)">Blended</button>
+        <button class="lang-pill" id="cpo-mode-paid" onclick="setCpoMode('paid',this)">Only paid</button>
+      </div>
+    </div>
     <div id="cost-by-period"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 
@@ -572,6 +579,14 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let currentGranularity = 'week';
+
+// Combined row of "Cost per Outcome — by Period & Channel".
+//   blended   = paid spend over ALL conversions, organic/SEO included. Default,
+//               because that is the cost the business actually pays per outcome.
+//   paid      = paid spend over the conversions attributed to Meta + Google only.
+// Spend is identical in both, there is no organic spend to add: what changes is
+// the denominator of every Cost/ row.
+let cpoMode = 'blended';
 let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
@@ -1367,7 +1382,17 @@ function renderCostByPeriod() {
     const organicAct  = organicKeys.reduce((s, k) => s + (acts[k]||0), 0);
     const organicCan  = organicCanKeys.reduce((s, k) => s + (cans[k]||0), 0);
     byDate[date] = {
-      combined: { spend: mS+gS, sig:(sigs.meta||0)+(sigs.google||0), trl:(trls.meta||0)+(trls.google||0), act:(acts.meta||0)+(acts.google||0), can:(cans.meta||0)+(cans.google||0) },
+      combined: cpoMode === 'blended'
+        ? { spend: mS+gS,
+            sig:(sigs.meta||0)+(sigs.google||0)+organicSig,
+            trl:(trls.meta||0)+(trls.google||0)+organicTrl,
+            act:(acts.meta||0)+(acts.google||0)+organicAct,
+            can:(cans.meta||0)+(cans.google||0)+organicCan }
+        : { spend: mS+gS,
+            sig:(sigs.meta||0)+(sigs.google||0),
+            trl:(trls.meta||0)+(trls.google||0),
+            act:(acts.meta||0)+(acts.google||0),
+            can:(cans.meta||0)+(cans.google||0) },
       meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0,   can: cans.meta||0   },
       google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0, can: cans.google||0 },
       organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct,     can: organicCan     },
@@ -1376,7 +1401,7 @@ function renderCostByPeriod() {
 
   // Sections: Combined, Meta, Google Ads, Organic
   const sections = [
-    { key: 'combined', label: 'Combined (paid)', color: 'var(--teal)',     hasPaid: true  },
+    { key: 'combined', label: 'Combined',        color: 'var(--teal)',     hasPaid: true  },
     { key: 'meta',     label: 'Meta',            color: 'var(--meta)',     hasPaid: true  },
     { key: 'google',   label: 'Google Ads',      color: 'var(--google)',   hasPaid: true  },
     { key: 'organic',  label: 'Organic',         color: 'var(--organic)',  hasPaid: false },
@@ -2502,6 +2527,13 @@ async function loadLocalisation() {
     document.getElementById('lang-charts').innerHTML  = '';
     document.getElementById('lang-cohort').innerHTML  = '';
   }
+}
+
+function setCpoMode(m, btn) {
+  cpoMode = m;
+  document.querySelectorAll('[id^="cpo-mode-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCostByPeriod();
 }
 
 function setCohortGranularity(g, btn) {
