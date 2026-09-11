@@ -54,17 +54,26 @@ const SOURCE_CASE = `
 
 const CAMPAIGN_CASE = `LOWER(COALESCE(substring(companies.signup_url, 'utm_campaign=([^&]*)'), ''))`;
 
-// "Ever active" = the contact has been a paying customer at some point.
-// The subscriptions table keeps no history (one row per company, updated in place),
-// so we combine two signals so an activation is never lost as the status evolves:
-//   - status IN ('active','past_due','unpaid'): currently paying OR in dunning.
-//     past_due/unpaid only occur AFTER being active, so they still count.
+// "Ever active" = the contact has PAID at least once. It is a cumulative event,
+// not a current state, so a customer that paid and later canceled still counts.
+// The subscriptions table keeps no history (one row per company, updated in
+// place), so we lean on two signals that accumulate instead of being overwritten:
+//   - an invoice with amount_paid > 0: money actually collected. Invoices are
+//     never rewritten, so this survives cancellation.
 //   - subscribed_at IS NOT NULL (across any of the company's subscription rows):
-//     was billed at least once, e.g. active-then-canceled.
-// Caveat: an active contact that cancels WITHOUT subscribed_at ever being set
-// cannot be recovered from current data (no snapshot history exists).
+//     was billed at least once. Under-populated, kept as a fallback for the
+//     customers that have no invoice row (older / managed accounts).
+// DO NOT put status IN ('active','past_due','unpaid') back in here. That was the
+// definition until 2026-09-11 and it counted 94 companies that never paid a cent.
+// Reaching past_due/unpaid does NOT imply a previous payment: a first charge that
+// is declined lands there straight away (company 5932, card declined on
+// 2026-09-11, zero invoices, was being counted as an activation).
+// Caveat: a customer that cancels with no invoice and no subscribed_at cannot be
+// recovered from current data (no snapshot history exists).
 const EVER_ACTIVE = `
-  (sub.status IN ('active','past_due','unpaid')
+  (EXISTS (SELECT 1 FROM invoices inv
+           WHERE inv.company_id = companies.id
+             AND inv.amount_paid > 0)
    OR EXISTS (SELECT 1 FROM subscriptions sx
               WHERE sx.company_id = companies.id
                 AND sx.subscribed_at IS NOT NULL))`;
