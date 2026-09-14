@@ -618,7 +618,14 @@ function fmtCur(n){ return n != null ? '€'+parseFloat(n).toFixed(2) : '–'; }
 // ── Campaign → utm_campaign mapping ────────────────────────────────────────
 // Maps ad-platform campaign names to Metabase utm_campaign values.
 // Meta: match by exact utm key or prefix function.
+// This list is only the safety net for when the API cannot read the UTMs off the
+// ads. It had gone stale: it held the Socialsky campaigns and none of the three
+// that went live on 31 Aug 2026, so when the lookup broke there was nothing to
+// fall back to and the table printed dashes.
 const META_CAMPAIGN_MAP = [
+  { name: 'ACQ / Overloop Signup / US-EN',                   utm: 'acq_try_now-usen' },
+  { name: 'ACQ / Overloop Signup / UK-IE-EN',                utm: 'acq_try_now-uken' },
+  { name: 'RTG / Overloop Signup / EN',                      utm: 'rtg_try_now-en' },
   { name: 'Socialsky / Lead / Overloop Signup / ESES',       utm: 'conversion_try_now-eses' },
   { name: 'Socialsky / Lead / Overloop Signup / BEFR + FRFR',utm: 'conversion_try_now-befr' },
   { name: 'Socialsky / Lead / Overloop Signup / UK',         utm: 'conversion_try_now-uken' },
@@ -1618,9 +1625,18 @@ function renderTables() {
         <td>${cpl != null ? fmtCur(cpl) : '—'}</td>
       </tr>`;
     });
+    // A failed lookup has to announce itself. Reading zero signups off a broken
+    // join and printing it as a dash is what hid the 14 Sep 2026 outage.
+    const utmBroke = (meta.utm_lookup_failed || []).length > 0;
+    const warning = utmBroke
+      ? `<p class="data-note" style="margin-top:10px;color:#f0a020">⚠ Could not read the UTMs off the ads for
+         ${meta.utm_lookup_failed.length} campaign(s), so signups fell back to the campaign-name map and may be
+         incomplete. Spend is unaffected.</p>`
+      : '';
     mEl.innerHTML = `<table><thead><tr>
       <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
     </tr></thead><tbody>${rows.join('')}</tbody></table>
+    ${warning}
     <p class="data-note" style="margin-top:10px">Spend from Meta, signups and trials from Metabase, joined on
     <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups and CPL spend ÷ trials, so neither
     uses Meta's attributed conversion count.</p>`;

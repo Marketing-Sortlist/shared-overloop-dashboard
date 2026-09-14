@@ -55,22 +55,53 @@ function linksOf(creative) {
   ].filter(Boolean);
 }
 
-async function utmByCampaign(base, accountId, token) {
+// asset_feed_spec is asked for by its one useful sub-field. object_story_spec is
+// NOT: Meta rejects sub-field selection inside it with
+// `(#100) Tried accessing nonexisting field (link)`, verified against v19.0 and
+// v24.0 on 14 Sep 2026, so it has to come whole. What actually keeps the payload
+// down is scoping the call to one campaign, below.
+const AD_FIELDS = 'creative{url_tags,object_story_spec,asset_feed_spec{link_urls}}';
+
+async function adsOfCampaign(base, campaignId, token) {
+  const out = [];
+  let next = `${base}/${campaignId}/ads?fields=${encodeURIComponent(AD_FIELDS)}&limit=100&access_token=${token}`;
+  // Meta hands back a complete URL in paging.next, token included. The page cap
+  // is a seatbelt against a cursor that never terminates, not a real limit: the
+  // busiest campaign here holds ten ads.
+  for (let page = 0; next && page < 20; page++) {
+    const res = await fetchJson(next);
+    out.push(...(res.data || []));
+    next = res.paging?.next || null;
+  }
+  return out;
+}
+
+// Asks each spending campaign for its own ads instead of sweeping the account.
+// The account holds 293 ads, nearly all of them archived Socialsky ones, and
+// pulling every creative in one call is what tipped Meta into the error above.
+// Failures are returned, not swallowed: a silent catch here is what made a
+// broken lookup indistinguishable from "these ads carry no UTM", and the table
+// showed spend against zero signups without anyone noticing.
+async function utmByCampaign(base, campaignIds, token) {
   const map = {};
-  try {
-    const fields = 'campaign_id,creative{url_tags,object_story_spec,asset_feed_spec}';
-    const res = await fetchJson(
-      `${base}/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=500&access_token=${token}`
-    );
-    for (const ad of res.data || []) {
-      for (const str of linksOf(ad.creative)) {
-        const utm = utmFrom(str);
-        if (!utm) continue;
-        (map[ad.campaign_id] ||= new Set()).add(utm);
+  const failed = [];
+  await Promise.all(campaignIds.map(async (id) => {
+    try {
+      for (const ad of await adsOfCampaign(base, id, token)) {
+        for (const str of linksOf(ad.creative)) {
+          const utm = utmFrom(str);
+          if (!utm) continue;
+          (map[id] ||= new Set()).add(utm);
+        }
       }
+    } catch (err) {
+      failed.push({ campaign_id: id, error: String(err?.message || err) });
     }
-  } catch (_) { /* the table falls back to its hardcoded map */ }
-  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, [...v]]));
+  }));
+  return {
+    map: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, [...v]])),
+    failed,
+  };
 }
 
 export async function onRequest(context) {
@@ -120,7 +151,9 @@ export async function onRequest(context) {
       };
     });
 
-    const utmMap = await utmByCampaign(BASE, accountId, token);
+    const { map: utmMap, failed: utmFailed } = await utmByCampaign(
+      BASE, campaignInsights.map(c => c.id), token
+    );
     for (const c of campaignInsights) c.utm_campaigns = utmMap[c.id] || [];
 
     const dailyData = await fetchJson(
@@ -147,6 +180,10 @@ export async function onRequest(context) {
       },
       campaigns: campaignInsights,
       daily,
+      // Empty when every campaign resolved. Non-empty means the UTM lookup
+      // itself broke, which is NOT the same as a campaign having no UTM: the
+      // table has to say so rather than print zero signups.
+      utm_lookup_failed: utmFailed,
     }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
