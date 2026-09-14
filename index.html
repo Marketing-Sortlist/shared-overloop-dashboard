@@ -1614,15 +1614,19 @@ function renderTables() {
         : (u => false);
       const sigs = sumCampaignMetric(sigsByCamp, 'meta', matchFn, 'signups');
       const trls = sumCampaignMetric(trlsByCamp, 'meta', matchFn, 'trials');
+      const acts = sumCampaignMetric(trlsByCamp, 'meta', matchFn, 'active');
       const cac  = sigs > 0 ? c.spend / sigs : null;
-      const cpl  = trls > 0 ? c.spend / trls : null;
+      const cpt  = trls > 0 ? c.spend / trls : null;
+      const cpa  = acts > 0 ? c.spend / acts : null;
       return `<tr>
         <td>${c.name}</td>
         <td>${fmt$(c.spend)}</td>
         <td>${fmtN(sigs || null)}</td>
         <td>${cac != null ? fmtCur(cac) : '—'}</td>
         <td>${fmtN(trls || null)}</td>
-        <td>${cpl != null ? fmtCur(cpl) : '—'}</td>
+        <td>${cpt != null ? fmtCur(cpt) : '—'}</td>
+        <td>${fmtN(acts || null)}</td>
+        <td>${cpa != null ? fmtCur(cpa) : '—'}</td>
       </tr>`;
     });
     // A failed lookup has to announce itself. Reading zero signups off a broken
@@ -1634,12 +1638,15 @@ function renderTables() {
          incomplete. Spend is unaffected.</p>`
       : '';
     mEl.innerHTML = `<table><thead><tr>
-      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
+      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>Cost/Trial</th>
+      <th>Active</th><th>Cost/Active</th>
     </tr></thead><tbody>${rows.join('')}</tbody></table>
     ${warning}
-    <p class="data-note" style="margin-top:10px">Spend from Meta, signups and trials from Metabase, joined on
-    <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups and CPL spend ÷ trials, so neither
-    uses Meta's attributed conversion count.</p>`;
+    <p class="data-note" style="margin-top:10px">Spend from Meta, the rest from Metabase, joined on
+    <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups, Cost/Trial spend ÷ trials and
+    Cost/Active spend ÷ actives, so none of them uses Meta's attributed conversion count. Active means the contact has
+    paid at least once, and a cohort needs about 21 days before that share settles, so on a window shorter than three
+    weeks Active reads low and Cost/Active reads high.</p>`;
   }
 
   // ── Google table ──

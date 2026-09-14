@@ -285,6 +285,10 @@ export async function onRequest(context) {
     } catch (_) {}
 
     // 1c. Trials by source + utm_campaign — V1 only (V2 part merged after V2_BASE/V2_STEP are defined)
+    // Trials AND actives per source + utm_campaign. step_num >= 8 is a trial
+    // (card entered), >= 9 has paid at least once. Read the actives with the
+    // maturity curve in mind: a cohort needs ~21 days before its Active share is
+    // final, so any window shorter than that under-reports it by roughly half.
     const tCampMap = {};
     try {
       const tv1Rows = await runSQL(env, `
@@ -309,15 +313,18 @@ export async function onRequest(context) {
           SELECT DISTINCT ON (email) email, source, campaign, step_num
           FROM raw ORDER BY email, step_num DESC
         )
-        SELECT source, campaign, COUNT(*) FILTER (WHERE step_num >= 8) AS trials
+        SELECT source, campaign,
+               COUNT(*) FILTER (WHERE step_num >= 8) AS trials,
+               COUNT(*) FILTER (WHERE step_num >= 9) AS active
         FROM deduped
         GROUP BY source, campaign
         ORDER BY source, campaign
       `);
-      for (const [source, campaign, t] of tv1Rows) {
+      for (const [source, campaign, t, a] of tv1Rows) {
         const key = `${source}|${campaign}`;
-        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0 };
+        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0, active: 0 };
         tCampMap[key].trials += parseInt(t) || 0;
+        tCampMap[key].active += parseInt(a) || 0;
       }
     } catch (_) {}
 
@@ -756,13 +763,16 @@ export async function onRequest(context) {
           FROM base
           GROUP BY 1, 2, 3
         )
-        SELECT source, campaign, COUNT(*) FILTER (WHERE step_num >= 8) AS trials
+        SELECT source, campaign,
+               COUNT(*) FILTER (WHERE step_num >= 8) AS trials,
+               COUNT(*) FILTER (WHERE step_num >= 9) AS active
         FROM raw GROUP BY 1, 2 ORDER BY 1, 2
       `);
-      for (const [source, campaign, t] of tv2Rows) {
+      for (const [source, campaign, t, a] of tv2Rows) {
         const key = `${source}|${campaign}`;
-        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0 };
+        if (!tCampMap[key]) tCampMap[key] = { source, campaign, trials: 0, active: 0 };
         tCampMap[key].trials += parseInt(t) || 0;
+        tCampMap[key].active += parseInt(a) || 0;
       }
     } catch (_) {}
     const trials_by_campaign = Object.values(tCampMap);
