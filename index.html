@@ -407,7 +407,13 @@
       </div>
     </div>
     <div class="section-card" style="overflow-x:auto">
-      <h3>Onboarding v2.1 — Channel Breakdown Table</h3>
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+        <h3 style="margin:0">Onboarding v2.1 — Channel Breakdown Table</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="lang-pill active" data-chdev="off" title="One row per channel. This is the headline, but the rows are not always comparable to each other: Meta is ~96% mobile because Reels are 9:16, while organic is about half desktop." onclick="setChannelDevice('off')">By source</button>
+          <button class="lang-pill" data-chdev="on" title="Adds a row per device under each channel. Desktop finishes the onboarding about four times more often than mobile, so a channel that buys mobile and one that gets desktop cannot be read against each other on the blended row alone." onclick="setChannelDevice('on')">Split by device</button>
+        </div>
+      </div>
       <div id="source-table-v21"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
@@ -454,7 +460,13 @@
       </div>
     </div>
     <div class="section-card" style="overflow-x:auto">
-      <h3>Onboarding v2 — Channel Breakdown Table</h3>
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+        <h3 style="margin:0">Onboarding v2 — Channel Breakdown Table</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="lang-pill active" data-chdev="off" title="One row per channel. This is the headline, but the rows are not always comparable to each other: Meta is ~96% mobile because Reels are 9:16, while organic is about half desktop." onclick="setChannelDevice('off')">By source</button>
+          <button class="lang-pill" data-chdev="on" title="Adds a row per device under each channel. Desktop finishes the onboarding about four times more often than mobile, so a channel that buys mobile and one that gets desktop cannot be read against each other on the blended row alone." onclick="setChannelDevice('on')">Split by device</button>
+        </div>
+      </div>
       <div id="source-table-v2"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="section-card">
@@ -598,6 +610,10 @@ let currentGranularity = 'week';
 // Spend is identical in both, there is no organic spend to add: what changes is
 // the denominator of every Cost/ row.
 let cpoMode = 'blended';
+// Channel Breakdown device split. Off by default: the source rows are the
+// headline, and the split is there for when you need to check that two channels
+// are actually comparable before reading their rates against each other.
+let channelDevice = 'off';
 let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
@@ -1983,7 +1999,9 @@ function renderSourceTableV2(cohort = 'v2') {
       .sort((a, b) => (b[1][0] || 0) - (a[1][0] || 0));
     // One device is not a split, it is the same row printed twice. And a source
     // too small for its own rates is too small to break down further.
-    if (devs.length > 1 && (fbs[key]?.[0] || 0) >= MIN_N_FOR_RATE) out.push(...devs.map(([d, v]) => row(d, v, true)));
+    if (channelDevice === 'on' && devs.length > 1 && (fbs[key]?.[0] || 0) >= MIN_N_FOR_RATE) {
+      out.push(...devs.map(([d, v]) => row(d, v, true)));
+    }
     return out;
   });
 
@@ -2654,6 +2672,13 @@ function setCpoMode(m) {
   document.querySelectorAll('[data-cpo]').forEach(b => b.classList.toggle('active', b.dataset.cpo === m));
   renderCostEvolution();
   renderCostByPeriod();
+}
+
+function setChannelDevice(m) {
+  channelDevice = m;
+  document.querySelectorAll('[data-chdev]').forEach(b => b.classList.toggle('active', b.dataset.chdev === m));
+  renderSourceTableV2('v2.1');
+  renderSourceTableV2('v2');
 }
 
 function setCohortGranularity(g, btn) {
