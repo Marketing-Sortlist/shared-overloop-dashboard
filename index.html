@@ -166,6 +166,11 @@
   .spinner { width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .no-data { color: var(--muted); padding: 12px; font-size: 12px; }
+  .table-note { font-size: 11px; color: var(--muted); margin: 8px 2px 0; line-height: 1.5; }
+  tr.sub-row td { color: var(--muted); font-size: 11px; }
+  tr.sub-row td:first-child { padding-left: 18px; text-transform: capitalize; }
+  .sub-tick { display: inline-block; width: 10px; margin-right: 5px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); height: 6px; vertical-align: middle; }
+  .immature { color: var(--muted); border-bottom: 1px dotted var(--muted); cursor: help; }
 
   @media (max-width: 900px) {
     .charts-row, .tables-row, .source-grid { grid-template-columns: 1fr; }
@@ -1693,20 +1698,52 @@ function switchFunnelTab(tab) {
 // The v2 and v2.1 tabs are the same funnel read two ways, so one renderer serves
 // both. Each tab is pinned to its cohort and to the measurement that was in force
 // for that cohort: v2 the pre-27-Aug definition, v2.1 today's paywall-based one.
+// Step 7 and 8 do NOT mean the same thing on either side of the 2026-08-27
+// release, so every label that names them is read off the cohort config instead
+// of being hardcoded. The leaking-bucket grids used to hardcode the v2.1 wording
+// and print it over the v2 cohort too.
+const V2_STEP_NAMES = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted'];
+
 const V2_TABS = {
   'v2.1': {
     filter: () => funnelV21Filter, setter: 'setFunnelV21Filter', stepsKey: 'steps',
     elId: 'funnel-v21-steps', src: 'funnel-v21-src-pills', dev: 'funnel-v21-dev-pills',
-    step7: 'Step 7 — Onboarding done, no card',
+    step7: 'Step 7 — Onboarding done',
     step8: 'Step 8 — Trial (paywall passed)',
+    // Column header and its short form for the channel table. NOT "No card":
+    // the funnel counts are cumulative (step >= n), so everyone who went on to
+    // put a card in is inside this number.
+    col7: 'Onboarding done', short7: 'Onb.',
+    stepNames: [...V2_STEP_NAMES, 'Onboarding done', 'Trial (card in)', 'Active'],
   },
   'v2': {
     filter: () => funnelV2Filter, setter: 'setFunnelV2Filter', stepsKey: 'steps_pre827',
     elId: 'funnel-v2-steps', src: 'funnel-v2-src-pills', dev: 'funnel-v2-dev-pills',
     step7: 'Step 7 — Reached Stripe checkout',
     step8: 'Step 8 — Trial (onboarding completed)',
+    col7: 'Reached checkout', short7: 'Checkout',
+    stepNames: [...V2_STEP_NAMES, 'Reached Stripe checkout', 'Trial (onboarding completed)', 'Active'],
   },
 };
+
+// Active is cumulative and slow: measured on weekly cohorts on 2026-09-01, a
+// 9-day-old cohort shows half of its final rate, and a window ending 14 days ago
+// returns zero actives on EVERY source, organic included. So a fresh window
+// rendering "0.0%" is a measurement artefact, not a result, and it reads as "this
+// channel converts nobody". Below this age the active-derived rates are hidden.
+const ACTIVE_MATURITY_DAYS = 21;
+
+// A rate computed on a handful of rows is noise dressed as precision (Meta on
+// desktop: 1 of 7 printed as 14.3%). Same threshold the Localisation cohort
+// heatmap already applies.
+const MIN_N_FOR_RATE = 10;
+
+function activeMaturity() {
+  const end = new Date(activeUntil + 'T00:00:00');
+  const ageDays = Math.floor((Date.now() - end.getTime()) / 86400000);
+  const readable = new Date(end.getTime() + ACTIVE_MATURITY_DAYS * 86400000);
+  return { mature: ageDays >= ACTIVE_MATURITY_DAYS, ageDays, readableFrom: readable.toISOString().slice(0, 10) };
+}
 
 // Breakdown maps for the secondary sections inside a cohort's tab, derived from
 // the cube so they read the same cohort and the same measurement as the funnel
@@ -1721,6 +1758,25 @@ function v2Breakdown(cohort, dim) {
     const steps = r[cfg.stepsKey] || r.steps;
     if (!out[r[dim]]) out[r[dim]] = Array(9).fill(0);
     steps.forEach((v, i) => { out[r[dim]][i] += v; });
+  }
+  return out;
+}
+
+// Same idea as v2Breakdown but keyed on two dimensions at once. Needed because a
+// source row is not comparable across channels on its own: Meta is ~96% mobile by
+// construction (Reels are 9:16) while organic is roughly half desktop, and in this
+// product desktop finishes the onboarding about four times more often. Comparing
+// the blended rows hides that; the device split puts it one glance away.
+function v2BreakdownBy(cohort, dim1, dim2) {
+  const { mb } = state;
+  const cfg = V2_TABS[cohort];
+  const out = {};
+  for (const r of mb?.funnel_v2_cube || []) {
+    if (r.cohort !== cohort) continue;
+    const steps = r[cfg.stepsKey] || r.steps;
+    if (!out[r[dim1]]) out[r[dim1]] = {};
+    if (!out[r[dim1]][r[dim2]]) out[r[dim1]][r[dim2]] = Array(9).fill(0);
+    steps.forEach((v, i) => { out[r[dim1]][r[dim2]][i] += v; });
   }
   return out;
 }
@@ -1825,7 +1881,7 @@ function renderSourceGridV2(cohort = 'v2') {
 
   const fbs = v2Breakdown(cohort, 'source');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
-  const stepLabels = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
+  const stepLabels = V2_TABS[cohort].stepNames;
 
   el.style.gridTemplateColumns = `repeat(${Math.min(srcKeys.length, 4)}, 1fr)`;
   el.innerHTML = srcKeys.map(key => {
@@ -1862,7 +1918,7 @@ function renderDeviceGridV2(cohort = 'v2') {
   if (fbd._error) { el.innerHTML = `<p class="no-data" style="color:var(--red)">Device query error: ${fbd._error}</p>`; return; }
 
   const DEVICE_COLOR = { desktop:'#14b8a6', mobile:'#f59e0b', tablet:'#8b5cf6', unknown:'#94a3b8' };
-  const stepLabels   = ['Email Confirmed','Domain Provided','Business Details','ICP Accepted','Channels Accepted','Sequence Accepted','Onboarding done, no card','Trial (card in)','Active'];
+  const stepLabels   = V2_TABS[cohort].stepNames;
 
   el.innerHTML = Object.entries(fbd).sort((a,b)=>(b[1][0]||0)-(a[1][0]||0)).map(([device, vals]) => {
     const color = DEVICE_COLOR[device] || '#94a3b8';
@@ -1892,38 +1948,57 @@ function renderSourceTableV2(cohort = 'v2') {
   if (!el) return;
   if (!mb?.funnel_v2_cube) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
 
+  const cfg     = V2_TABS[cohort];
+  const mat     = activeMaturity();
   const fbs     = v2Breakdown(cohort, 'source');
+  const fbsd    = v2BreakdownBy(cohort, 'source', 'device');
   const srcKeys = Object.keys(fbs).sort((a, b) => (fbs[b]?.[0]||0) - (fbs[a]?.[0]||0));
 
-  const rows = srcKeys.map(key => {
-    const v          = fbs[key] || [];
-    const signups    = v[0] || 0;
-    const stripe     = v[6] || 0;
-    const trialing   = v[7] || 0;
-    const active     = v[8] || 0;
-    const rSignTrial = signups  > 0 ? ((trialing / signups)  * 100).toFixed(1) + '%' : '–';
-    const rTrialAct  = trialing > 0 ? ((active   / trialing) * 100).toFixed(1) + '%' : '–';
-    const rStripeTri = stripe   > 0 ? ((trialing / stripe)   * 100).toFixed(1) + '%' : '–';
-    const rSignAct   = signups  > 0 ? ((active   / signups)  * 100).toFixed(1) + '%' : '–';
-    return `<tr>
-      <td>${srcLabel(key)}</td>
+  // Every rate is gated on ITS OWN denominator, not on the row's signups: a row
+  // can have 200 signups and 6 people at step 7, and that step-7 rate is noise.
+  const rate = (num, den) => den >= MIN_N_FOR_RATE ? ((num / den) * 100).toFixed(1) + '%' : '–';
+
+  const row = (label, v, sub) => {
+    const signups = v[0] || 0, onb = v[6] || 0, trial = v[7] || 0, active = v[8] || 0;
+    const activeCell = mat.mature
+      ? fmtN(active)
+      : `<span class="immature" title="Cohort younger than ${ACTIVE_MATURITY_DAYS} days, so this count is still filling">${fmtN(active)}</span>`;
+    return `<tr class="${sub ? 'sub-row' : ''}">
+      <td>${sub ? '<span class="sub-tick"></span>' : ''}${label}</td>
       <td>${fmtN(signups)}</td>
-      <td>${fmtN(stripe)}</td>
-      <td>${fmtN(trialing)}</td>
-      <td>${fmtN(active)}</td>
-      <td>${rSignTrial}</td>
-      <td>${rTrialAct}</td>
-      <td>${rStripeTri}</td>
-      <td>${rSignAct}</td>
+      <td>${fmtN(onb)}</td>
+      <td>${fmtN(trial)}</td>
+      <td>${activeCell}</td>
+      <td>${rate(onb,   signups)}</td>
+      <td>${rate(trial, onb)}</td>
+      <td>${rate(trial, signups)}</td>
+      <td>${mat.mature ? rate(active, trial) : '–'}</td>
     </tr>`;
+  };
+
+  const rows = srcKeys.flatMap(key => {
+    const out  = [row(srcLabel(key), fbs[key] || [], false)];
+    const devs = Object.entries(fbsd[key] || {})
+      .filter(([, v]) => (v[0] || 0) > 0)
+      .sort((a, b) => (b[1][0] || 0) - (a[1][0] || 0));
+    // One device is not a split, it is the same row printed twice. And a source
+    // too small for its own rates is too small to break down further.
+    if (devs.length > 1 && (fbs[key]?.[0] || 0) >= MIN_N_FOR_RATE) out.push(...devs.map(([d, v]) => row(d, v, true)));
+    return out;
   });
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Source</th><th>Signups</th><th>No card</th><th>Trial</th><th>Active</th><th>Signup→Trial</th><th>Trial→Active</th><th>No card→Trial</th><th>Signup→Active</th>
+      <th>Source</th><th>Signups</th><th>${cfg.col7}</th><th>Trial</th><th>Active</th>
+      <th>Signup→${cfg.short7}</th><th>${cfg.short7}→Trial</th><th>Signup→Trial</th><th>Trial→Active</th>
     </tr></thead>
     <tbody>${rows.join('')}</tbody>
-  </table>`;
+  </table>
+  <p class="table-note">${
+    mat.mature
+      ? `Counts are cumulative: “${cfg.col7}” includes everyone who went on to start a trial.`
+      : `Counts are cumulative: “${cfg.col7}” includes everyone who went on to start a trial. Active needs ~${ACTIVE_MATURITY_DAYS} days to mature and this window ${mat.ageDays <= 0 ? 'has not closed yet' : `closed ${mat.ageDays} day${mat.ageDays === 1 ? '' : 's'} ago`}, so its rate is hidden until ${mat.readableFrom}.`
+  } Rates on fewer than ${MIN_N_FOR_RATE} are hidden.</p>`;
 }
 
 function renderV2ConversionChart() {
