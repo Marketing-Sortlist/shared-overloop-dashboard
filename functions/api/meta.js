@@ -104,6 +104,48 @@ async function utmByCampaign(base, campaignIds, token) {
   };
 }
 
+// ── ad-level spend ─────────────────────────────────────────────────────────
+//
+// The campaign call above is what the Campaigns table runs on. This one is for
+// the campaign to ad tree, and it is a separate request on purpose: one row per
+// ad carrying its own adset and campaign, which is the ONLY place that hierarchy
+// exists. Metabase knows an ad id and an adset id off the UTMs, never which
+// campaign an adset belongs to, and never the human names.
+//
+// It also decides which rows the tree has at all. Built from Meta, an ad that
+// spent and produced nothing still shows up with its spend and a zero; built
+// from Metabase it would silently vanish. In the 30 days to 20 Sep 2026 that was
+// 14 of the 25 ads with spend.
+//
+// No time_increment here: the tree is a total for the range, not a series.
+const AD_LEVEL_FIELDS = 'ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,clicks';
+
+async function adInsights(base, accountId, tr, token) {
+  const rows = [];
+  // limit=500 is not cosmetic. The default of 25 truncates without an error,
+  // which is how this dashboard lost four weeks of data once already.
+  let next = `${base}/${accountId}/insights?fields=${AD_LEVEL_FIELDS}`
+    + `&time_range=${tr}&level=ad&limit=500&access_token=${token}`;
+  for (let page = 0; next && page < 20; page++) {
+    const res = await fetchJson(next);
+    for (const d of res.data || []) {
+      rows.push({
+        ad_id: d.ad_id,
+        ad_name: d.ad_name || d.ad_id,
+        adset_id: d.adset_id || '',
+        adset_name: d.adset_name || '(no ad set)',
+        campaign_id: d.campaign_id || '',
+        campaign_name: d.campaign_name || '(no campaign)',
+        spend: parseFloat(d.spend || 0),
+        impressions: parseInt(d.impressions || 0),
+        clicks: parseInt(d.clicks || 0),
+      });
+    }
+    next = res.paging?.next || null;
+  }
+  return rows;
+}
+
 export async function onRequest(context) {
   const { env, request } = context;
   const url = new URL(request.url);
@@ -156,6 +198,8 @@ export async function onRequest(context) {
     );
     for (const c of campaignInsights) c.utm_campaigns = utmMap[c.id] || [];
 
+    const ads = await adInsights(BASE, accountId, tr, token);
+
     const dailyData = await fetchJson(
       `${BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions&time_range=${tr}&time_increment=1&limit=500&${attrWindows}&access_token=${token}`
     );
@@ -179,6 +223,9 @@ export async function onRequest(context) {
         cpl_meta_reported: leads > 0 ? spend / leads : 0,
       },
       campaigns: campaignInsights,
+      // One row per ad for the range, with its adset and campaign. The tree is
+      // built from these, not from the funnel rows.
+      ads,
       daily,
       // Empty when every campaign resolved. Non-empty means the UTM lookup
       // itself broke, which is NOT the same as a campaign having no UTM: the
