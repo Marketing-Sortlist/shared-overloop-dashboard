@@ -54,6 +54,18 @@ const SOURCE_CASE = `
 
 const CAMPAIGN_CASE = `LOWER(COALESCE(substring(companies.signup_url, 'utm_campaign=([^&]*)'), ''))`;
 
+// utm_term carries the Meta ad set id and utm_content the ad id, written by the
+// ads themselves. Verified 21 Sep 2026 against ad 120252652550630502, which Meta
+// resolves to "ACQ-US / Video / MattAnna_en" under the same ad set id the UTM
+// carries. Deliberately NOT lowercased, unlike the campaign: these are numeric
+// ids joined against Meta's own, not human labels.
+const ADSET_CASE = `substring(companies.signup_url, 'utm_term=([^&]*)')`;
+const AD_CASE    = `substring(companies.signup_url, 'utm_content=([^&]*)')`;
+
+// Only rows that actually carry an ad id. Without it every non-Meta signup lands
+// in one empty bucket that swamps the real ads.
+const HAS_AD_FILTER = `AND companies.signup_url ~ 'utm_content='`;
+
 // "Ever active" = the contact has PAID at least once. It is a cumulative event,
 // not a current state, so a customer that paid and later canceled still counts.
 // The subscriptions table keeps no history (one row per company, updated in
@@ -326,6 +338,58 @@ export async function onRequest(context) {
         tCampMap[key].trials += parseInt(t) || 0;
         tCampMap[key].active += parseInt(a) || 0;
       }
+    } catch (_) {}
+
+    // 1c-bis. The same trials and actives one level down, per ad set and ad, so
+    // the tree can rank creatives on trial and not only on signup. Same step
+    // thresholds as above, same 21-day maturity caveat, and the volumes are far
+    // thinner: 39 trials across 11 ads in the 30 days to 20 Sep 2026, so a single
+    // ad's trial count is only readable over several weeks.
+    //
+    // GROUP BY is positional throughout. Three of the selected aliases expand to
+    // substrings of companies.signup_url, and naming them in GROUP BY is what
+    // trips PostgreSQL's alias expansion, the same reason the V2 block below
+    // already does it.
+    const tAdMap = {};
+    const addAdRow = (source, adset_id, ad_id, t, a) => {
+      const key = `${source}|${adset_id}|${ad_id}`;
+      if (!tAdMap[key]) tAdMap[key] = { source, adset_id, ad_id, trials: 0, active: 0 };
+      tAdMap[key].trials += parseInt(t) || 0;
+      tAdMap[key].active += parseInt(a) || 0;
+    };
+    try {
+      const av1Rows = await runSQL(env, `
+        WITH raw AS (
+          SELECT
+            u.email,
+            ${SOURCE_CASE} AS source,
+            ${ADSET_CASE}  AS adset_id,
+            ${AD_CASE}     AS ad_id,
+            ${STEP_CASE}   AS step_num
+          FROM companies
+          LEFT JOIN LATERAL (
+            SELECT * FROM subscriptions WHERE subscriptions.company_id = companies.id ORDER BY id DESC LIMIT 1
+          ) sub ON true
+          JOIN LATERAL (
+            SELECT * FROM users WHERE users.company_id = companies.id ORDER BY id ASC LIMIT 1
+          ) u ON true
+          WHERE companies.created_at >= '${since}' AND companies.created_at < '${until1}'
+          ${HAS_AD_FILTER}
+          ${INTERNAL_FILTER}
+          ${V1_ONLY_FILTER}
+        ),
+        deduped AS (
+          SELECT DISTINCT ON (email) email, source, adset_id, ad_id, step_num
+          FROM raw ORDER BY email, step_num DESC
+        )
+        SELECT source, adset_id, ad_id,
+               COUNT(*) FILTER (WHERE step_num >= 8) AS trials,
+               COUNT(*) FILTER (WHERE step_num >= 9) AS active
+        FROM deduped
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2, 3
+      `);
+      for (const [source, adset_id, ad_id, t, a] of av1Rows) addAdRow(source, adset_id, ad_id, t, a);
     } catch (_) {}
 
     // 2. Funnel — one cube by (source, device), same reason as the v2 one below:
@@ -777,6 +841,35 @@ export async function onRequest(context) {
     } catch (_) {}
     const trials_by_campaign = Object.values(tCampMap);
 
+    // 1c-bis (V2 part). The ad-level half of the V2 onboarding, merged into the
+    // same tAdMap the V1 half filled. A signup counts once, under whichever
+    // onboarding it went through.
+    try {
+      const av2Rows = await runSQL(env, `
+        WITH base AS (
+          SELECT
+            u.email        AS email,
+            ${SOURCE_CASE} AS source,
+            ${ADSET_CASE}  AS adset_id,
+            ${AD_CASE}     AS ad_id,
+            ${V2_STEP}     AS step_val
+          ${V2_BASE}
+          ${HAS_AD_FILTER}
+        ),
+        raw AS (
+          SELECT email, source, adset_id, ad_id, MAX(step_val) AS step_num
+          FROM base
+          GROUP BY 1, 2, 3, 4
+        )
+        SELECT source, adset_id, ad_id,
+               COUNT(*) FILTER (WHERE step_num >= 8) AS trials,
+               COUNT(*) FILTER (WHERE step_num >= 9) AS active
+        FROM raw GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
+      `);
+      for (const [source, adset_id, ad_id, t, a] of av2Rows) addAdRow(source, adset_id, ad_id, t, a);
+    } catch (_) {}
+    const trials_by_ad = Object.values(tAdMap);
+
     // V1 + V2 per-period cancellations
     let cancellations_daily = [], cancellations_v2_daily = [];
     try {
@@ -1025,6 +1118,7 @@ export async function onRequest(context) {
       signups_daily,
       signups_by_campaign,
       signups_by_ad,
+      trials_by_ad,
       trials_by_campaign,
       trials_daily,
       activations_daily,

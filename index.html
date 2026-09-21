@@ -101,6 +101,20 @@
   tr:hover td { background: var(--surface2); }
   .attr-note { font-size: 11px; color: var(--muted); margin-bottom: 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
 
+  /* Campaign → ad set → ad tree. Two clickable levels, the third is a leaf. */
+  table.tree tr.lvl-c, table.tree tr.lvl-s { cursor: pointer; }
+  table.tree tr.lvl-c > td:first-child { font-weight: 600; }
+  table.tree tr.lvl-s { background: var(--surface2); }
+  table.tree tr.lvl-a td { color: var(--muted); }
+  table.tree tr.lvl-a td:first-child { color: var(--text); }
+  table.tree td { white-space: nowrap; }
+  .tw { display: inline-block; width: 14px; color: var(--muted); font-size: 9px; }
+  td.i1 { padding-left: 26px; } td.i2 { padding-left: 46px; }
+  .tree .idsub { font-size: 10px; color: var(--muted); font-weight: 400; }
+  /* A rate off a handful of signups is not a rate. Greyed instead of hidden, so
+     the row still shows, and the eye does not rank on it. */
+  .thin { color: var(--muted); opacity: .55; }
+
   /* Funnel sub-tabs */
   .funnel-sub-nav { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
   .funnel-sub-nav button { padding: 8px 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
@@ -349,6 +363,18 @@
     <div class="table-card">
       <h3><span class="badge badge-google">GOOGLE ADS</span> Campaigns</h3>
       <div id="google-table"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <div class="section-card" style="padding:10px 16px">
+    <h3 class="collapsible-hdr" onclick="toggleSection('meta-tree-row','meta-tree-chevron')" style="cursor:pointer;display:flex;align-items:center;gap:8px;margin:0">
+      Meta — campaign to ad set to ad
+      <span id="meta-tree-chevron" style="font-size:12px;color:var(--muted);transition:transform .2s;transform:rotate(-90deg)">▼</span>
+    </h3>
+  </div>
+  <div id="meta-tree-row" style="display:none;margin-bottom:16px">
+    <div class="table-card">
+      <div id="meta-tree"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
 
@@ -1612,6 +1638,139 @@ function renderSignupsChart() {
   });
 }
 
+// ── Meta campaign → ad set → ad ────────────────────────────────────────────
+//
+// The tree is built from Meta's ad-level SPEND rows, never from the funnel rows,
+// and that choice is the whole point. Metabase only knows an ad that produced a
+// signup: in the 30 days to 20 Sep 2026, 14 of the 25 ads with spend produced
+// none, and built the other way round those 14 would silently vanish instead of
+// showing their spend against a zero.
+//
+// Meta also holds the only copy of the hierarchy and the names. The UTMs carry
+// an ad id and an ad set id and nothing else, so `120252652550630502` becomes
+// "ACQ-US / Video / MattAnna_en", and an ad set gets a campaign to sit under,
+// only through these rows.
+//
+// The join key is the ad id itself (utm_content), not utm_campaign as the table
+// above uses. Signups come from signups_by_ad and trials from trials_by_ad, the
+// same pairing the Campaigns table makes one level up, so the two agree.
+function renderMetaTree() {
+  const el = document.getElementById('meta-tree');
+  if (!el) return;
+  const { meta, mb } = state;
+  if (!meta || !mb) { el.innerHTML = '<p class="no-data">No data</p>'; return; }
+
+  const sigs = (mb.signups_by_ad || []).filter(r => r.source === 'meta');
+  const trls = (mb.trials_by_ad  || []).filter(r => r.source === 'meta');
+
+  const ads = new Map();
+  const blank = (id, adset, camp, adset_id) => ({
+    ad_id: id, ad_name: id, adset, campaign: camp, adset_id: adset_id || '',
+    spend: 0, signups: 0, trials: 0, active: 0,
+  });
+
+  for (const r of (meta.ads || [])) {
+    if (!ads.has(r.ad_id)) ads.set(r.ad_id, blank(r.ad_id, r.adset_name, r.campaign_name, r.adset_id));
+    const a = ads.get(r.ad_id);
+    a.ad_name = r.ad_name; a.adset = r.adset_name; a.campaign = r.campaign_name; a.adset_id = r.adset_id;
+    a.spend += r.spend;
+  }
+  // An ad that produced signups outside the spend window, or that Meta no longer
+  // returns, still belongs in the tree. It is parked under a named bucket rather
+  // than dropped, because a signup nobody can attribute is worth seeing.
+  const park = '(no spend in range)';
+  for (const r of sigs) {
+    if (!ads.has(r.ad_id)) ads.set(r.ad_id, blank(r.ad_id, park, park, r.adset_id));
+    ads.get(r.ad_id).signups += r.signups;
+  }
+  for (const r of trls) {
+    if (!ads.has(r.ad_id)) ads.set(r.ad_id, blank(r.ad_id, park, park, r.adset_id));
+    const a = ads.get(r.ad_id);
+    a.trials += r.trials; a.active += r.active;
+  }
+
+  const roll = (dst, src) => { dst.spend += src.spend; dst.signups += src.signups; dst.trials += src.trials; dst.active += src.active; };
+  const camps = new Map();
+  for (const a of ads.values()) {
+    if (!camps.has(a.campaign)) camps.set(a.campaign, { name: a.campaign, spend: 0, signups: 0, trials: 0, active: 0, sets: new Map() });
+    const c = camps.get(a.campaign);
+    roll(c, a);
+    if (!c.sets.has(a.adset)) c.sets.set(a.adset, { name: a.adset, spend: 0, signups: 0, trials: 0, active: 0, ads: [] });
+    const g = c.sets.get(a.adset);
+    roll(g, a);
+    g.ads.push(a);
+  }
+  const bySpend = (x, y) => y.spend - x.spend || y.signups - x.signups;
+  const list = [...camps.values()].sort(bySpend);
+  for (const c of list) {
+    c.setList = [...c.sets.values()].sort(bySpend);
+    for (const g of c.setList) g.ads.sort(bySpend);
+  }
+  if (!list.length) { el.innerHTML = '<p class="no-data">No spend and no ad-attributed signups in this range.</p>'; return; }
+
+  const dash = '<span style="color:var(--muted)">–</span>';
+  const ratio = (sp, n) => n > 0 && sp > 0 ? fmtCur(sp / n) : dash;
+  // Below 20 signups a signup-to-trial rate moves by whole percentage points on
+  // one trial, so it is printed greyed. The number is still there, it just does
+  // not invite a ranking it cannot support.
+  const rate = (t, s) => s > 0
+    ? `<span class="${s < 20 ? 'thin' : ''}">${(t / s * 100).toFixed(1)}%</span>`
+    : dash;
+  const cells = (r) => `<td>${fmt$(r.spend)}</td><td>${fmtN(r.signups || null)}</td>
+    <td>${ratio(r.spend, r.signups)}</td><td>${fmtN(r.trials || null)}</td>
+    <td>${ratio(r.spend, r.trials)}</td><td>${rate(r.trials, r.signups)}</td>
+    <td>${fmtN(r.active || null)}</td>`;
+
+  let html = `<table class="tree"><thead><tr>
+    <th>Campaign, ad set, ad</th><th>Spend</th><th>Signups</th><th>CAC</th>
+    <th>Trials</th><th>Cost/Trial</th><th>Sign→Trial</th><th>Active</th>
+  </tr></thead><tbody>`;
+  list.forEach((c, ci) => {
+    html += `<tr class="lvl-c" data-camp="${ci}">
+      <td><span class="tw">▸</span>${c.name}</td>${cells(c)}</tr>`;
+    c.setList.forEach((g, gi) => {
+      html += `<tr class="lvl-s kid c${ci}" hidden data-set="${ci}-${gi}">
+        <td class="i1"><span class="tw">▸</span>${g.name}</td>${cells(g)}</tr>`;
+      g.ads.forEach(a => {
+        html += `<tr class="lvl-a kid s${ci}-${gi}" hidden>
+          <td class="i2">${a.ad_name}<div class="idsub">${a.ad_id}</div></td>${cells(a)}</tr>`;
+      });
+    });
+  });
+  html += `</tbody></table>
+    <p class="data-note" style="margin-top:10px">Spend from Meta at ad level, signups and trials from Metabase,
+    joined on the ad id the ads write into <code>utm_content</code>. Click a campaign or an ad set to open it.
+    An ad that spent and produced nothing still appears, with a dash where its CAC would be. Sign→Trial is greyed
+    under 20 signups, where one trial moves it by several points. Active is shown without a cost per active because
+    at this depth it is almost always nought or one, and a cohort needs about 21 days before that share settles.</p>`;
+  el.innerHTML = html;
+
+  // Listeners are attached on every render because innerHTML above discards the
+  // previous ones along with the table.
+  const table = el.querySelector('table.tree');
+  table.addEventListener('click', (e) => {
+    const row = e.target.closest('tr.lvl-c, tr.lvl-s');
+    if (!row) return;
+    const tw = row.querySelector('.tw');
+    const open = tw.textContent === '▾';
+    tw.textContent = open ? '▸' : '▾';
+    if (row.classList.contains('lvl-c')) {
+      const ci = row.dataset.camp;
+      table.querySelectorAll(`tr.c${ci}`).forEach(r => {
+        r.hidden = open;
+        // Closing a campaign closes its ad sets too. Otherwise reopening it
+        // shows loose ads with no parent above them.
+        if (open) {
+          const t2 = r.querySelector('.tw'); if (t2) t2.textContent = '▸';
+          table.querySelectorAll(`tr.s${r.dataset.set}`).forEach(x => { x.hidden = true; });
+        }
+      });
+    } else {
+      table.querySelectorAll(`tr.s${row.dataset.set}`).forEach(r => { r.hidden = open; });
+    }
+  });
+}
+
 function renderTables() {
   const { meta, google, mb } = state;
   const sigsByCamp  = mb ? (mb.signups_by_campaign  || []) : [];
@@ -1669,6 +1828,8 @@ function renderTables() {
     paid at least once, and a cohort needs about 21 days before that share settles, so on a window shorter than three
     weeks Active reads low and Cost/Active reads high.</p>`;
   }
+
+  renderMetaTree();
 
   // ── Google table ──
   const gEl = document.getElementById('google-table');
