@@ -1709,7 +1709,12 @@ function renderMetaTree() {
   if (!list.length) { el.innerHTML = '<p class="no-data">No spend and no ad-attributed signups in this range.</p>'; return; }
 
   const dash = '<span style="color:var(--muted)">–</span>';
-  const ratio = (sp, n) => n > 0 && sp > 0 ? fmtCur(sp / n) : dash;
+  // `thin` greys a cost that rests on too few events to rank on. Cost/Active is
+  // the worst offender: over the 90 days to 21 Sep 2026 exactly one ad reached
+  // three actives and eight sat on one, so a single payment sets the number.
+  const ratio = (sp, n, thin = 0) => n > 0 && sp > 0
+    ? `<span class="${n < thin ? 'thin' : ''}">${fmtCur(sp / n)}</span>`
+    : dash;
   // Below 20 signups a signup-to-trial rate moves by whole percentage points on
   // one trial, so it is printed greyed. The number is still there, it just does
   // not invite a ranking it cannot support.
@@ -1718,12 +1723,12 @@ function renderMetaTree() {
     : dash;
   const cells = (r) => `<td>${fmt$(r.spend)}</td><td>${fmtN(r.signups || null)}</td>
     <td>${ratio(r.spend, r.signups)}</td><td>${fmtN(r.trials || null)}</td>
-    <td>${ratio(r.spend, r.trials)}</td><td>${rate(r.trials, r.signups)}</td>
-    <td>${fmtN(r.active || null)}</td>`;
+    <td>${ratio(r.spend, r.trials, 3)}</td><td>${rate(r.trials, r.signups)}</td>
+    <td>${fmtN(r.active || null)}</td><td>${ratio(r.spend, r.active, 3)}</td>`;
 
   let html = `<table class="tree"><thead><tr>
-    <th>Campaign, ad set, ad</th><th>Spend</th><th>Signups</th><th>CAC</th>
-    <th>Trials</th><th>Cost/Trial</th><th>Sign→Trial</th><th>Active</th>
+    <th>Campaign, ad set, ad</th><th>Spend</th><th>Signups</th><th>Cost/Signup</th>
+    <th>Trials</th><th>Cost/Trial</th><th>Sign→Trial</th><th>Active</th><th>Cost/Active</th>
   </tr></thead><tbody>`;
   list.forEach((c, ci) => {
     html += `<tr class="lvl-c" data-camp="${ci}">
@@ -1740,9 +1745,10 @@ function renderMetaTree() {
   html += `</tbody></table>
     <p class="data-note" style="margin-top:10px">Spend from Meta at ad level, signups and trials from Metabase,
     joined on the ad id the ads write into <code>utm_content</code>. Click a campaign or an ad set to open it.
-    An ad that spent and produced nothing still appears, with a dash where its CAC would be. Sign→Trial is greyed
-    under 20 signups, where one trial moves it by several points. Active is shown without a cost per active because
-    at this depth it is almost always nought or one, and a cohort needs about 21 days before that share settles.</p>`;
+    An ad that spent and produced nothing still appears, with a dash where its Cost/Signup would be. Anything
+    resting on too little is greyed rather than hidden: Sign→Trial under 20 signups, where one trial moves it by
+    several points, and Cost/Trial and Cost/Active under 3 events. Read Active with its maturity in mind, since a
+    cohort needs about 21 days before that share settles, so on a short window Active reads low and its cost high.</p>`;
   el.innerHTML = html;
 
   // Listeners are attached on every render because innerHTML above discards the
@@ -1818,12 +1824,12 @@ function renderTables() {
          incomplete. Spend is unaffected.</p>`
       : '';
     mEl.innerHTML = `<table><thead><tr>
-      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>Cost/Trial</th>
+      <th>Campaign</th><th>Spend</th><th>Signups</th><th>Cost/Signup</th><th>Trials</th><th>Cost/Trial</th>
       <th>Active</th><th>Cost/Active</th>
     </tr></thead><tbody>${rows.join('')}</tbody></table>
     ${warning}
     <p class="data-note" style="margin-top:10px">Spend from Meta, the rest from Metabase, joined on
-    <code>utm_campaign</code> read from each campaign's own ads. CAC is spend ÷ signups, Cost/Trial spend ÷ trials and
+    <code>utm_campaign</code> read from each campaign's own ads. Cost/Signup is spend ÷ signups, Cost/Trial spend ÷ trials and
     Cost/Active spend ÷ actives, so none of them uses Meta's attributed conversion count. Active means the contact has
     paid at least once, and a cohort needs about 21 days before that share settles, so on a window shorter than three
     weeks Active reads low and Cost/Active reads high.</p>`;
@@ -1853,7 +1859,7 @@ function renderTables() {
       </tr>`;
     });
     gEl.innerHTML = `<table><thead><tr>
-      <th>Campaign</th><th>Spend</th><th>Signups</th><th>CAC</th><th>Trials</th><th>CPL</th>
+      <th>Campaign</th><th>Spend</th><th>Signups</th><th>Cost/Signup</th><th>Trials</th><th>CPL</th>
     </tr></thead><tbody>${rows.join('')}</tbody></table>`;
   }
 }
