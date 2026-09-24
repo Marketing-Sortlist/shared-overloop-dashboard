@@ -41,8 +41,19 @@ function getDateRange(url) {
   return { since, until, until1: fmt(u1) };
 }
 
+// 'direct' = an account that never went through the signup page, so it has no
+// signup_url: sales-created or otherwise set up by hand (company 6131, paying
+// since 2026-09-17, three users, no onboarding, no trial). They are kept out of
+// organic so a sales deal does not read as a web conversion.
+// The date guard matters: signup_url was not recorded before February 2026, so
+// before that EVERY company has it NULL and the rule would swallow them all.
+// Verified 2026-09-24: from March to date, 4 companies without a URL in total.
+const DIRECT_SINCE = '2026-03-01';
+
 const SOURCE_CASE = `
   CASE
+    WHEN companies.signup_url IS NULL
+         AND companies.created_at >= '${DIRECT_SINCE}'                          THEN 'direct'
     WHEN LOWER(COALESCE(substring(companies.signup_url, 'utm_source=([^&]*)'), '')) = 'facebook' THEN 'meta'
     WHEN LOWER(COALESCE(substring(companies.signup_url, 'utm_source=([^&]*)'), '')) = 'google'
       OR companies.signup_url LIKE '%_gcl_aw%' THEN 'google'
@@ -132,8 +143,13 @@ const PAID_CANCEL = `(
 const STEP_CASE = `
   CASE
     WHEN ${EVER_ACTIVE}                                                                                       THEN 9
+    -- A card is required. Every signup gets an automatic 'trialing' subscription
+    -- with no card, so status alone counts people who never started a trial
+    -- (5 phantom trials in Sep 2026, e.g. company 5645, still 'trialing' with no
+    -- Stripe id a week after its trial_end). Same rule the v2 funnel applies.
     WHEN u.current_signup_step = 'finished'
-         AND sub.status = 'trialing'                                                                          THEN 8
+         AND sub.status = 'trialing'
+         AND sub.stripe_id IS NOT NULL                                                                        THEN 8
     WHEN u.current_signup_step IN ('mobile-pitch','campaign-wizard')
          AND u.last_campaign_wizard_step = 'congrats'                                                         THEN 7
     WHEN u.current_signup_step IN ('mobile-pitch','campaign-wizard')

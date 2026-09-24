@@ -640,6 +640,10 @@ let cpoMode = 'blended';
 // headline, and the split is there for when you need to check that two channels
 // are actually comparable before reading their rates against each other.
 let channelDevice = 'off';
+// Collapsed sections of the "by Period & Channel" table. Kept in state because
+// the table is rebuilt on every data or mode change. Google Ads starts folded
+// while it has no spend.
+let cpoCollapsed = { google: true };
 let spendChart, donutChart, signupsChart, costEvolutionChart, v2ConversionChart;
 let state = {};
 let annotationsData = {};   // { 'YYYY-MM-DD': { date, text, created_at } } — Performance chart
@@ -715,8 +719,8 @@ const CHART_OPTS = {
 };
 
 // ── Source helpers ──────────────────────────────────────────────────────────
-const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustpilot:'#00b67a', organic:'#8b5cf6' };
-const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic' };
+const SRC_COLORS = { meta:'#1877f2', google:'#ea4335', youtube:'#ff4444', trustpilot:'#00b67a', organic:'#8b5cf6', direct:'#94a3b8' };
+const SRC_LABELS = { meta:'Meta', google:'Google Ads', youtube:'YouTube', trustpilot:'Trustpilot', organic:'Organic', direct:'Direct/Sales' };
 function srcColor(s) { return SRC_COLORS[s] || '#94a3b8'; }
 function srcLabel(s) { return SRC_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)); }
 
@@ -1276,12 +1280,14 @@ function renderCostEvolution() {
   const cSig = [], cTrl = [], cAct = [];
   const nSig = [], nTrl = [], nAct = [];
   const nSigMeta = [], nSigGoogle = [], nTrlMeta = [], nTrlGoogle = [], nActMeta = [], nActGoogle = [];
-  const nSigOrg = [], nTrlOrg = [], nActOrg = [];
+  const nSigOrg = [], nTrlOrg = [], nActOrg = [], nActDirect = [];
 
   // Everything that is neither Meta nor Google: organic/SEO plus the smaller
   // unpaid referrers. Counted in the denominators only in blended mode.
+  // 'direct' (sales-created accounts, no signup page) is not organic: it only
+  // adds its activations, and only in blended mode.
   const organicOf = (m) => Object.keys(m)
-    .filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count')
+    .filter(k => k !== 'meta' && k !== 'google' && k !== 'direct' && k !== 'date' && k !== 'count')
     .reduce((sum, k) => sum + (m[k] || 0), 0);
 
   for (const date of dates) {
@@ -1295,10 +1301,11 @@ function renderCostEvolution() {
     const oSig = blended ? organicOf(sigs)                  : 0;
     const oTrl = blended ? organicOf(trlsByD[date] || {})   : 0;
     const oAct = blended ? organicOf(actsByD[date] || {})   : 0;
+    const dAct = blended ? ((actsByD[date] || {}).direct || 0) : 0;
 
     const paidSig = mSig + gSig + oSig;
     const trl     = mTrl + gTrl + oTrl;
-    const act     = mAct + gAct + oAct;
+    const act     = mAct + gAct + oAct + dAct;
 
     cSig.push(spend > 0 && paidSig > 0 ? Math.round(spend / paidSig * 100)/100 : null);
     cTrl.push(spend > 0 && trl > 0     ? Math.round(spend / trl     * 100)/100 : null);
@@ -1306,7 +1313,7 @@ function renderCostEvolution() {
 
     nSig.push(paidSig); nSigMeta.push(mSig); nSigGoogle.push(gSig); nSigOrg.push(oSig);
     nTrl.push(trl);     nTrlMeta.push(mTrl); nTrlGoogle.push(gTrl); nTrlOrg.push(oTrl);
-    nAct.push(act);     nActMeta.push(mAct); nActGoogle.push(gAct); nActOrg.push(oAct);
+    nAct.push(act);     nActMeta.push(mAct); nActGoogle.push(gAct); nActOrg.push(oAct); nActDirect.push(dAct);
   }
 
   const datasets = [
@@ -1317,7 +1324,7 @@ function renderCostEvolution() {
     { type: 'bar', label: '#Trials',  data: nTrl, metaData: nTrlMeta, googleData: nTrlGoogle, organicData: nTrlOrg,
       backgroundColor: 'rgba(245,158,11,0.20)', borderColor: 'rgba(245,158,11,0.45)', borderWidth: 1,
       yAxisID: 'y1', order: 2, hidden: true },
-    { type: 'bar', label: '#Active',  data: nAct, metaData: nActMeta, googleData: nActGoogle, organicData: nActOrg,
+    { type: 'bar', label: '#Active',  data: nAct, metaData: nActMeta, googleData: nActGoogle, organicData: nActOrg, directData: nActDirect,
       backgroundColor: 'rgba(34,197,94,0.18)',  borderColor: 'rgba(34,197,94,0.4)',  borderWidth: 1,
       yAxisID: 'y1', order: 2, hidden: true },
     // Cost lines — left axis
@@ -1344,6 +1351,8 @@ function renderCostEvolution() {
             const o = item.dataset.organicData?.[i] ?? 0;
             const parts = [`Meta: ${m}`, `Google: ${g}`];
             if (cpoMode === 'blended') parts.push(`Organic: ${o}`);
+            const d = item.dataset.directData?.[i] ?? 0;
+            if (cpoMode === 'blended' && d > 0) parts.push(`Direct/Sales: ${d}`);
             return ` ${item.dataset.label}: ${item.parsed.y}  (${parts.join(', ')})`;
           }
           const v = item.parsed.y;
@@ -1451,8 +1460,13 @@ function renderCostByPeriod() {
     const mS = mSpendByD[date] || 0, gS = gSpendByD[date] || 0;
     const sigs = sigsByD[date] || {}, trls = trlsByD[date] || {}, acts = actsByD[date] || {}, cans = cansByD[date] || {};
     // "Organic" = sum of all non-meta/google sources (youtube, trustpilot, organic, etc.)
-    const organicKeys    = Object.keys(sigs).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
-    const organicCanKeys = Object.keys(cans).filter(k => k !== 'meta' && k !== 'google' && k !== 'date' && k !== 'count');
+    // 'direct' = sales-created accounts that never used the signup page. Not a
+    // web channel, so it stays out of organic and only brings its activations
+    // and cancels, which join Combined in blended mode.
+    const isOrganicKey   = k => k !== 'meta' && k !== 'google' && k !== 'direct' && k !== 'date' && k !== 'count';
+    const organicKeys    = Object.keys(sigs).filter(isOrganicKey);
+    const organicCanKeys = Object.keys(cans).filter(isOrganicKey);
+    const dAct = acts.direct || 0, dCan = cans.direct || 0;
     const organicSig  = organicKeys.reduce((s, k) => s + (sigs[k]||0), 0);
     const organicTrl  = organicKeys.reduce((s, k) => s + (trls[k]||0), 0);
     const organicAct  = organicKeys.reduce((s, k) => s + (acts[k]||0), 0);
@@ -1462,8 +1476,8 @@ function renderCostByPeriod() {
         ? { spend: mS+gS,
             sig:(sigs.meta||0)+(sigs.google||0)+organicSig,
             trl:(trls.meta||0)+(trls.google||0)+organicTrl,
-            act:(acts.meta||0)+(acts.google||0)+organicAct,
-            can:(cans.meta||0)+(cans.google||0)+organicCan }
+            act:(acts.meta||0)+(acts.google||0)+organicAct+dAct,
+            can:(cans.meta||0)+(cans.google||0)+organicCan+dCan }
         : { spend: mS+gS,
             sig:(sigs.meta||0)+(sigs.google||0),
             trl:(trls.meta||0)+(trls.google||0),
@@ -1472,6 +1486,7 @@ function renderCostByPeriod() {
       meta:     { spend: mS,    sig: sigs.meta||0,   trl: trls.meta||0,   act: acts.meta||0,   can: cans.meta||0   },
       google:   { spend: gS,    sig: sigs.google||0, trl: trls.google||0, act: acts.google||0, can: cans.google||0 },
       organic:  { spend: 0,     sig: organicSig,      trl: organicTrl,     act: organicAct,     can: organicCan     },
+      direct:   { spend: 0,     sig: 0,               trl: 0,              act: dAct,           can: dCan           },
     };
   }
 
@@ -1481,6 +1496,8 @@ function renderCostByPeriod() {
     { key: 'meta',     label: 'Meta',            color: 'var(--meta)',     hasPaid: true  },
     { key: 'google',   label: 'Google Ads',      color: 'var(--google)',   hasPaid: true  },
     { key: 'organic',  label: 'Organic',         color: 'var(--organic)',  hasPaid: false },
+    { key: 'direct',   label: 'Direct/Sales',    color: 'var(--direct)',   hasPaid: false, only: ['act', 'can'],
+      note: 'no trial, not from the signup flow' },
   ];
 
   // Rows per section
@@ -1510,15 +1527,18 @@ function renderCostByPeriod() {
     </tr></thead><tbody>`;
 
   for (const sec of sections) {
-    const metrics = allMetrics.filter(m => !m.paidOnly || sec.hasPaid);
-    html += `<tr style="background:var(--surface2)">
-      <td colspan="${colSpan}" style="font-size:11px;font-weight:700;color:${sec.color};text-transform:uppercase;letter-spacing:.5px;padding:5px 8px">${sec.label}</td>
+    const metrics = allMetrics.filter(m => (!m.paidOnly || sec.hasPaid) && (!sec.only || sec.only.includes(m.key)));
+    const folded  = !!cpoCollapsed[sec.key];
+    const note    = sec.note ? `<span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px">${sec.note}</span>` : '';
+    html += `<tr style="background:var(--surface2);cursor:pointer" onclick="toggleCpoSection('${sec.key}')">
+      <td colspan="${colSpan}" style="font-size:11px;font-weight:700;color:${sec.color};text-transform:uppercase;letter-spacing:.5px;padding:5px 8px">`
+      + `<span style="display:inline-block;width:10px;transition:transform .15s;transform:rotate(${folded ? '-90deg' : '0deg'})">▾</span> ${sec.label}${note}</td>
     </tr>`;
+    if (folded) continue;
     for (const m of metrics) {
-      const dim  = !sec.hasPaid ? 'opacity:.6;' : '';
       const hl   = m.hl ? 'background:rgba(79,142,247,0.06);' : '';
       const lblSt = m.hl ? 'color:var(--text);font-weight:600;font-size:12px;' : 'color:var(--muted);font-size:11px;';
-      html += `<tr style="${dim}${hl}">
+      html += `<tr style="${hl}">
         <td></td>
         <td style="${lblSt}padding-left:12px">${m.label}</td>
         ${dates.map(d => {
@@ -1531,6 +1551,11 @@ function renderCostByPeriod() {
   }
   html += '</tbody></table>';
   el.innerHTML = html;
+}
+
+function toggleCpoSection(key) {
+  cpoCollapsed[key] = !cpoCollapsed[key];
+  renderCostByPeriod();
 }
 
 function renderSpendCharts() {
